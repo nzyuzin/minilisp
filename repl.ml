@@ -9,9 +9,14 @@ let rec string_of_cons c to_string = match c with
   | Nil -> "()"
   | Cons(a, rest) -> "(" ^ to_string a ^ " " ^ string_of_cons rest to_string ^ ")"
 
-and string_of_sexp c = match c with
+let rec string_of_sexp c =
+  let rec string_of_cons_content c = match c with
+    | Nil -> ""
+    | Cons(a, Nil) -> string_of_sexp a
+    | Cons(a, rest) -> string_of_sexp a ^ " " ^ string_of_cons_content rest in
+  match c with
   | Value(str) -> str
-  | Sexp(cons) -> string_of_cons cons string_of_sexp
+  | Sexp(cons) -> "(" ^ string_of_cons_content cons ^ ")"
 
 let car = function
   | Nil -> raise EmptyCons
