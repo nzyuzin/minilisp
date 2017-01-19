@@ -18,6 +18,8 @@ let rec string_of_sexp c =
   | Value(str) -> str
   | Sexp(cons) -> "(" ^ string_of_cons_content cons ^ ")"
 
+let cons a b = Cons(a, b)
+
 let car = function
   | Nil -> raise EmptyCons
   | Cons(a, b) -> a
@@ -88,7 +90,11 @@ let rec repl () = begin
     with
       | EmptyCons -> error "Empty cons!"
       | NotSexp -> error "Not an S-expression!"
-      | NotMatchingBraces -> error "Not matching amount of braces!" in
+      | NotMatchingBraces -> error "Not matching amount of braces!"
+      | End_of_file ->
+          print_endline "";
+          print_endline "Terminated by user";
+          exit 0 in
   print_caret ();
   flush stdout;
   process_input ();
