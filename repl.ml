@@ -163,27 +163,38 @@ let rec repl () = begin
   let error str = print_endline ("Error: " ^ str) in
   let print_caret () = print_string "/> " in
   let read_line () = input_line stdin in
-  let process_input () =
-    try
-      let input = read_line () in
-      let parsed_input = parse_input input in
-      let evaled_input = Value(eval parsed_input global_context) in
-      print_endline (string_of_sexp evaled_input string_of_lang_type);
-    with
-      | EmptyCons -> error "Empty cons!"
-      | NotSexp -> error "Not an S-expression!"
-      | NotMatchingBraces -> error "Not matching amount of braces!"
-      | NotApplicable -> error "Not applicable operation!"
-      | CannotEvaluate -> error "Expression cannot be evaluated!"
-      | CannotCast(value, to_type) -> error ("Cannot cast " ^ value ^ "to type " ^ to_type ^ "!")
-      | UnboundValue(s) -> error ("Unbound value: " ^ s ^ "!")
-      | End_of_file ->
-          print_endline "";
-          print_endline "Terminated by user";
-          exit 0 in
+  let process_input (): string sexp option =
+    let parsed_input = ref None in
+    let try_read =
+      try
+        parsed_input := Some (parse_input (read_line ()))
+      with
+        | NotSexp -> error "Not an S-expression!"
+        | NotMatchingBraces -> error "Not matching amount of braces!"
+        | End_of_file -> begin
+            print_endline "";
+            print_endline "Terminated by user";
+            exit 0;
+          end in
+    try_read;
+    !parsed_input in
   print_caret ();
   flush stdout;
-  process_input ();
+  begin
+    match process_input () with
+      | None -> ();
+      | Some parsed_sexp ->
+        try
+          let evaled_input = Value (eval parsed_sexp global_context) in
+          print_endline (string_of_sexp evaled_input string_of_lang_type)
+        with
+          | EmptyCons -> error "Empty cons!"
+          | NotApplicable -> error "Not applicable operation!"
+          | CannotEvaluate -> error "Expression cannot be evaluated!"
+          | CannotCast(value, to_type) ->
+              error ("Cannot cast " ^ value ^ " to type " ^ to_type ^ "!")
+          | UnboundValue(s) -> error ("Unbound value: " ^ s);
+  end;
   print_endline "";
   repl ()
 end
