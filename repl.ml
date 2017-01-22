@@ -1,108 +1,107 @@
-exception EmptyCons
 exception NotSexp
 exception NotMatchingBraces
 exception NotApplicable
 exception CannotEvaluate
 exception UnboundValue of string
 exception CannotCast of string * string
+exception ArgumentsMismatch of int * int
+exception TypeError
 
-type 'a cons = Nil | Cons of 'a * 'a cons
-type 'b sexp = Value of 'b | Sexp of 'b sexp cons
-
-let rec string_of_cons c to_string = match c with
-  | Nil -> "()"
-  | Cons(a, rest) -> "(" ^ to_string a ^ " " ^ string_of_cons rest to_string ^ ")"
+type 'b sexp = Value of 'b | Sexp of 'b sexp list
 
 let rec string_of_sexp c to_string =
-  let rec string_of_cons_content c = match c with
-    | Nil -> ""
-    | Cons(a, Nil) -> string_of_sexp a to_string
-    | Cons(a, rest) -> string_of_sexp a to_string ^ " " ^ string_of_cons_content rest in
+  let rec string_of_list_content c = match c with
+    | [] -> ""
+    | [a] -> string_of_sexp a to_string
+    | a :: rest -> string_of_sexp a to_string ^ " " ^ string_of_list_content rest in
   match c with
   | Value(v) -> to_string v
-  | Sexp(cons) -> "(" ^ string_of_cons_content cons ^ ")"
+  | Sexp(cons) -> "(" ^ string_of_list_content cons ^ ")"
 
-type lang_type =
-  | Unit
-  | Int of int
-  | String of string
-  | Variable of lang_type
-  | Function of (lang_type cons -> lang_type)
+type ltype =
+  | LUnit
+  | LInt of int
+  | LString of string
+  | LCons of ltype * ltype
+  | LVariable of ltype
+  | LFunction of (ltype list -> ltype)
 
-let rec string_of_lang_type = function
-  | Unit -> "()"
-  | Int(i) -> string_of_int i
-  | String(s) -> s
-  | Variable(lt) -> string_of_lang_type lt
-  | Function(_) -> "<function>"
+let rec string_of_ltype =
+  let rec nil_terminated = function
+    | LCons(a, LUnit) -> true
+    | LCons(_, rest) -> nil_terminated rest
+    | _ -> false in
+  let rec string_of_lcons = function
+    | LCons(a, LUnit) -> string_of_ltype a
+    | LCons(a, rest) when nil_terminated rest -> string_of_ltype a ^ " " ^ string_of_lcons rest
+    | LCons(a, rest) -> string_of_ltype a ^ " . " ^ string_of_ltype rest
+    | x -> string_of_ltype x in
+  function
+  | LUnit -> "()"
+  | LInt(i) -> string_of_int i
+  | LString(s) -> s
+  | LCons(c, d) as x -> "(" ^ string_of_lcons x ^ ")"
+  | LVariable(lt) -> string_of_ltype lt
+  | LFunction(_) -> "<function>"
+
+let rec lcons_of_list = function
+  | [] -> LUnit
+  | x :: [] -> x
+  | x :: xs -> LCons(x, lcons_of_list xs)
 
 let rec is_int (x: string) =
   let is_digit c =
     let code = Char.code c in
-    code > (Char.code '0') && code < (Char.code '9') in
+    code >= (Char.code '0') && code <= (Char.code '9') in
   let length = String.length x in
   if length = 0 then false
   else if length = 1 then is_digit x.[0]
   else is_digit x.[0] && is_int (String.sub x 1 (length - 1))
 
-let int_of_lang_type = function
-  | Int(i) -> i
-  | v -> raise (CannotCast (string_of_lang_type v, "int"))
+let int_of_ltype = function
+  | LInt(i) -> i
+  | v -> raise (CannotCast (string_of_ltype v, "int"))
 
 let is_string (x: string) =
   let length = String.length x in
   (x.[0] = '\'' && x.[length - 1] = '\'')
   || (x.[0] = '"' && x.[length - 1] = '"')
 
-let rec lookup (name: string) (context: (string * lang_type) list): lang_type option =
+let rec lookup (name: string) (context: (string * ltype) list): ltype option =
   match context with
   | [] -> None
   | (name', value) :: xs -> if name = name' then (Some value) else lookup name xs
 
 let is_variable (x: string) context = match lookup x context with
-| Some(Variable(_)) -> true
+| Some(LVariable(_)) -> true
 | _ -> false
 
 let is_function (x: string) context = match lookup x context with
-| Some(Function(_)) -> true
+| Some(LFunction(_)) -> true
 | _ -> false
 
-let rec cons_map (f: 'a -> 'b) (l: 'a cons): 'b cons = match l with
-  | Nil -> Nil
-  | Cons(v, r) -> Cons(f(v), cons_map f r)
-
-let rec eval (expression: string sexp) context: lang_type =
+let rec eval (expression: string sexp) context: ltype =
   let unwrap = function
     | Some x -> x
     | None -> raise (Failure "Unwrap on eval failed") in
   match expression with
   | Value(v) ->
-      if is_int v then Int(int_of_string v)
-      else if is_string v then String(v)
+      if is_int v then LInt(int_of_string v)
+      else if is_string v then LString(v)
       else if is_variable v context then unwrap (lookup v context)
       else if is_function v context then unwrap (lookup v context)
       else raise (UnboundValue v)
   | Sexp(c) -> begin  match c with
-    | Nil -> Unit
-    | Cons(v, rest) -> apply v rest context
+    | [] -> LUnit
+    | v :: rest -> apply v rest context
   end
 
-and apply (f: string sexp) (arguments: string sexp cons) context: lang_type =
+and apply (f: string sexp) (arguments: string sexp list) context: ltype =
   let evaled_func = eval f context in
-  let evaled_arguments: lang_type cons = cons_map (fun x -> eval x context) arguments in
+  let evaled_arguments: ltype list = List.map (fun x -> eval x context) arguments in
   match evaled_func with
-  | Function(func) -> func evaled_arguments
+  | LFunction(func) -> func evaled_arguments
   | _ -> raise NotApplicable
-
-let cons a b = Cons(a, b)
-
-let car = function
-  | Nil -> raise EmptyCons
-  | Cons(a, b) -> a
-
-let cdr = function
-  | Nil -> raise EmptyCons
-  | Cons(a, b) -> b
 
 let rec parse_input (source: unit -> string): string sexp =
   let read_word (s: string): string =
@@ -131,16 +130,15 @@ let rec parse_input (source: unit -> string): string sexp =
         if str.[0] = ' ' then trim_head (String.sub str 1 (length - 1))
         else str in
     String.trim (trim_head str) in
-  let rec parse_cons str: string sexp cons =
+  let rec parse_cons str: string sexp list =
     let length = String.length str in
-    if length = 0 || str = "()"
-    then
-      Nil
+    if length = 0 then []
+    else if str = "()" then [Sexp([])]
     else
       let word = read_word str in
       let word_length = String.length word in
       let after_word = String.sub str word_length (length - word_length) in
-      Cons(parse_sexp word, parse_cons (trim after_word))
+      parse_sexp word :: parse_cons (trim after_word)
   and parse_sexp str: string sexp =
     let length = String.length str in
     let rec no_spaces s =
@@ -149,7 +147,7 @@ let rec parse_input (source: unit -> string): string sexp =
         true
       else if s.[0] = ' ' then false
       else no_spaces (String.sub s 1 (s_length - 1)) in
-    if length = 0 then Sexp(Nil)
+    if length = 0 then Sexp([])
     else if str.[0] = '(' && str.[length - 1] = ')' then
       Sexp(parse_cons (trim (String.sub str 1 (length - 2))))
     else if no_spaces str then
@@ -158,9 +156,33 @@ let rec parse_input (source: unit -> string): string sexp =
       raise NotSexp in
   parse_sexp (read_word (trim (source ())))
 
+let check_arguments expected actual =
+  raise (ArgumentsMismatch(expected, actual))
 
-let global_context: (string * lang_type) list =
-  [("+", Function((fun c -> Int(int_of_lang_type(car(c)) + int_of_lang_type(car(cdr(c)))))))]
+let global_context: (string * ltype) list =
+  [("+", LFunction(fun arguments ->
+     LInt(int_of_ltype(List.hd arguments) + int_of_ltype(List.hd (List.tl arguments)))));
+   ("cons", LFunction(fun arguments ->
+     let length = List.length arguments in
+     if length = 2 then
+       let f = List.hd arguments in
+       let s = lcons_of_list (List.tl arguments) in
+       LCons(f, s)
+     else check_arguments 2  length));
+    ("car", LFunction(fun arguments ->
+      let length = List.length arguments in
+      if length = 1 then
+        match List.hd arguments with
+        | LCons(f, s) -> f
+        | _ -> raise TypeError
+      else check_arguments 1 length));
+    ("cdr", LFunction(fun arguments ->
+      let length = List.length arguments in
+      if length = 1 then
+        match List.hd arguments with
+        | LCons(f, s) -> s
+        | _ -> raise TypeError
+      else check_arguments 1 length))]
 
 let rec repl () = begin
   let error str = print_endline ("Error: " ^ str) in
@@ -188,19 +210,26 @@ let rec repl () = begin
       | None -> ();
       | Some parsed_sexp ->
         try
-          let evaled_input = Value (eval parsed_sexp global_context) in
-          print_endline (";Value: " ^ (string_of_sexp evaled_input string_of_lang_type))
+          let evaled_input = eval parsed_sexp global_context in
+          print_endline (";Value: " ^ (string_of_ltype evaled_input))
         with
-          | EmptyCons -> error "Empty cons!"
           | NotApplicable -> error "Not applicable operation!"
           | CannotEvaluate -> error "Expression cannot be evaluated!"
           | CannotCast(value, to_type) ->
               error ("Cannot cast " ^ value ^ " to type " ^ to_type ^ "!")
-          | UnboundValue(s) -> error ("Unbound value: " ^ s);
+          | UnboundValue(s) -> error ("Unbound value: " ^ s)
+          | ArgumentsMismatch(expected, got) -> error ("Wrong number of
+          arguments provided! Expected " ^ string_of_int expected ^ " but got "
+          ^ string_of_int got ^ "!")
+          | TypeError -> error ("The object is not of the correct type")
   end;
   print_endline "";
   repl ()
 end
+
+let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), LUnit))))
+let test_sexp = eval (Sexp([Value("cons"); Value("1"); Value("2")])) global_context
+let test_cons = string_of_ltype test_sexp
 
 let _ =
   repl ()
