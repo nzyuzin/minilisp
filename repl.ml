@@ -9,15 +9,6 @@ exception TypeError
 
 type 'b sexp = Value of 'b | Sexp of 'b sexp list
 
-let rec string_of_sexp c to_string =
-  let rec string_of_list_content c = match c with
-    | [] -> ""
-    | [a] -> string_of_sexp a to_string
-    | a :: rest -> string_of_sexp a to_string ^ " " ^ string_of_list_content rest in
-  match c with
-  | Value(v) -> to_string v
-  | Sexp(cons) -> "(" ^ string_of_list_content cons ^ ")"
-
 type ltype =
   | LUnit
   | LInt of int
@@ -44,11 +35,6 @@ let rec string_of_ltype =
   | LCons(c, d) as x -> "(" ^ string_of_lcons x ^ ")"
   | LIdentifier(s) -> s
   | LFunction(_) -> "<function>"
-
-let rec lcons_of_list = function
-  | [] -> LUnit
-  | x :: [] -> x
-  | x :: xs -> LCons(x, lcons_of_list xs)
 
 let rec is_int (x: string) =
   let is_digit c =
