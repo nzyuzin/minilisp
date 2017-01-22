@@ -7,7 +7,7 @@ exception UnboundValue of string
 exception CannotCast of string * string
 
 type 'a cons = Nil | Cons of 'a * 'a cons
-and 'b sexp = Value of 'b | Sexp of 'b sexp cons
+type 'b sexp = Value of 'b | Sexp of 'b sexp cons
 
 let rec string_of_cons c to_string = match c with
   | Nil -> "()"
