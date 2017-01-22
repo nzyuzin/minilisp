@@ -23,8 +23,9 @@ type ltype =
   | LInt of int
   | LString of string
   | LCons of ltype * ltype
-  | LVariable of ltype
-  | LFunction of (ltype list -> ltype)
+  | LVariable of string
+  | LFunction of (ltype list -> context -> ltype)
+and context = (string * ltype) list
 
 let rec string_of_ltype =
   let rec nil_terminated = function
@@ -41,7 +42,7 @@ let rec string_of_ltype =
   | LInt(i) -> string_of_int i
   | LString(s) -> s
   | LCons(c, d) as x -> "(" ^ string_of_lcons x ^ ")"
-  | LVariable(lt) -> string_of_ltype lt
+  | LVariable(s) -> s
   | LFunction(_) -> "<function>"
 
 let rec lcons_of_list = function
@@ -67,20 +68,25 @@ let is_string (x: string) =
   (x.[0] = '\'' && x.[length - 1] = '\'')
   || (x.[0] = '"' && x.[length - 1] = '"')
 
-let rec lookup (name: string) (context: (string * ltype) list): ltype option =
-  match context with
+let rec lookup (ctxt: context) (name: string) : ltype option =
+  match ctxt with
   | [] -> None
-  | (name', value) :: xs -> if name = name' then (Some value) else lookup name xs
+  | (name', value) :: xs -> if name = name' then (Some value) else lookup xs name
 
-let is_variable (x: string) context = match lookup x context with
+let rec extend_context (ctxt: context) (name: string) (value: ltype): context =
+  (name, value) :: ctxt
+
+let is_variable (x: string) ctxt = match lookup ctxt x with
 | Some(LVariable(_)) -> true
 | _ -> false
 
-let is_function (x: string) context = match lookup x context with
+let is_function (x: string) ctxt = match lookup ctxt x with
 | Some(LFunction(_)) -> true
 | _ -> false
 
-let rec eval (expression: string sexp) context: ltype =
+let is_lambda (x: string) ctxt = x = "lambda"
+
+let rec eval (expression: string sexp) ctxt: ltype =
   let unwrap = function
     | Some x -> x
     | None -> raise (Failure "Unwrap on eval failed") in
@@ -88,19 +94,20 @@ let rec eval (expression: string sexp) context: ltype =
   | Value(v) ->
       if is_int v then LInt(int_of_string v)
       else if is_string v then LString(v)
-      else if is_variable v context then unwrap (lookup v context)
-      else if is_function v context then unwrap (lookup v context)
+      else if is_variable v ctxt then unwrap (lookup ctxt v)
+      else if is_function v ctxt then unwrap (lookup ctxt v)
+      else if is_lambda v ctxt then LString("lambda")
       else raise (UnboundValue v)
   | Sexp(c) -> begin  match c with
     | [] -> LUnit
-    | v :: rest -> apply v rest context
+    | v :: rest -> apply v rest ctxt
   end
 
-and apply (f: string sexp) (arguments: string sexp list) context: ltype =
-  let evaled_func = eval f context in
-  let evaled_arguments: ltype list = List.map (fun x -> eval x context) arguments in
+and apply (f: string sexp) (arguments: string sexp list) ctxt: ltype =
+  let evaled_func = eval f ctxt in
+  let evaled_arguments: ltype list = List.map (fun x -> eval x ctxt) arguments in
   match evaled_func with
-  | LFunction(func) -> func evaled_arguments
+  | LFunction(func) -> func evaled_arguments ctxt
   | _ -> raise NotApplicable
 
 let rec parse_input (source: unit -> string): string sexp =
@@ -160,23 +167,23 @@ let check_arguments expected actual =
   raise (ArgumentsMismatch(expected, actual))
 
 let global_context: (string * ltype) list =
-  [("+", LFunction(fun arguments ->
+  [("+", LFunction(fun arguments ctxt ->
      LInt(int_of_ltype(List.hd arguments) + int_of_ltype(List.hd (List.tl arguments)))));
-   ("cons", LFunction(fun arguments ->
+   ("cons", LFunction(fun arguments ctxt ->
      let length = List.length arguments in
      if length = 2 then
        let f = List.hd arguments in
        let s = lcons_of_list (List.tl arguments) in
        LCons(f, s)
      else check_arguments 2  length));
-   ("car", LFunction(fun arguments ->
+   ("car", LFunction(fun arguments ctxt ->
      let length = List.length arguments in
      if length = 1 then
        match List.hd arguments with
        | LCons(f, s) -> f
        | _ -> raise TypeError
      else check_arguments 1 length));
-   ("cdr", LFunction(fun arguments ->
+   ("cdr", LFunction(fun arguments ctxt ->
      let length = List.length arguments in
      if length = 1 then
        match List.hd arguments with
