@@ -39,35 +39,27 @@ let rec string_of_ltype =
   | LIdentifier(s) -> s
   | LFunction(_) -> "<function>"
 
-let rec is_int (x: string) =
-  let is_digit c =
-    let code = Char.code c in
-    code >= (Char.code '0') && code <= (Char.code '9') in
-  let length = String.length x in
-  if length = 0 then false
-  else if length = 1 then is_digit x.[0]
-  else is_digit x.[0] && is_int (String.sub x 1 (length - 1))
-
-let int_of_ltype = function
-  | LInt(i) -> i
-  | v -> raise (CannotCast (string_of_ltype v, "int"))
-
-let is_bool (x: string) =
-  x = "#t" || x = "#f"
-
-let bool_of_ltype_string b =
-  if b = "#t" then true
-  else if b = "#f" then false
-  else raise (CannotCast (b, "bool"))
-
-let is_string (x: string) =
-  let length = String.length x in
-  (x.[0] = '\'' && x.[length - 1] = '\'')
-  || (x.[0] = '"' && x.[length - 1] = '"')
-
 let is_identifier str: bool = true
 
 let rec ltype_of_sexp (expression: string sexp): ltype =
+  let rec is_int (x: string) =
+    let is_digit c =
+      let code = Char.code c in
+      code >= (Char.code '0') && code <= (Char.code '9') in
+    let length = String.length x in
+    if length = 0 then false
+    else if length = 1 then is_digit x.[0]
+    else is_digit x.[0] && is_int (String.sub x 1 (length - 1)) in
+  let is_bool (x: string) =
+    x = "#t" || x = "#f" in
+  let is_string (x: string) =
+    let length = String.length x in
+    (x.[0] = '\'' && x.[length - 1] = '\'')
+    || (x.[0] = '"' && x.[length - 1] = '"') in
+  let bool_of_ltype_string b =
+    if b = "#t" then true
+    else if b = "#f" then false
+    else raise (CannotCast (b, "bool")) in
   let rec ltype_of_sexp_list = function
     | [] -> LUnit
     | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs) in
@@ -246,52 +238,38 @@ let rec parse_input (source: unit -> string): string sexp =
 let bad_arguments expected actual =
   raise (ArgumentsMismatch(expected, actual))
 
+let one_argument_function f: ltype =
+  LFunction(fun arguments ctxt ->
+    let length = ltype_length arguments in
+    if length = 1 then
+      f (ltype_car arguments)
+    else bad_arguments 1 length)
+
+let two_arguments_function (func : 'a -> 'b -> ltype): ltype =
+  LFunction(fun arguments ctxt ->
+    let length = ltype_length arguments in
+    if length = 2 then
+      let f = ltype_car arguments in
+      let s = ltype_car (ltype_cdr arguments) in
+      func f s
+    else bad_arguments 2 length)
+
+let int_of_ltype = function
+  | LInt(i) -> i
+  | v -> raise (CannotCast (string_of_ltype v, "int"))
+
+let two_ints_function (operator: int -> int -> int): ltype =
+  two_arguments_function (fun f s -> LInt(operator (int_of_ltype f) (int_of_ltype s)))
+
 let global_context: context = ref
-  [("+", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 2 then
-       let f = ltype_car arguments in
-       let s = ltype_car (ltype_cdr arguments) in
-       LInt(int_of_ltype f + int_of_ltype s)
-     else bad_arguments 2 length));
-   ("-", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 2 then
-       let f = ltype_car arguments in
-       let s = ltype_car (ltype_cdr arguments) in
-       LInt(int_of_ltype f - int_of_ltype s)
-     else bad_arguments 2 length));
-   ("*", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 2 then
-       let f = ltype_car arguments in
-       let s = ltype_car (ltype_cdr arguments) in
-       LInt(int_of_ltype f * int_of_ltype s)
-     else bad_arguments 2 length));
-   ("=", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 2 then
-       let f = ltype_car arguments in
-       let s = ltype_car (ltype_cdr arguments) in
-       LBool(int_of_ltype f = int_of_ltype s)
-     else bad_arguments 2 length));
-   ("cons", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 2 then
-       let f = ltype_car arguments in
-       let s = ltype_car (ltype_cdr arguments) in
-       LCons(f, s)
-     else bad_arguments 2 length));
-   ("car", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 1 then
-       ltype_car (ltype_car arguments)
-     else bad_arguments 1 length));
-   ("cdr", LFunction(fun arguments ctxt ->
-     let length = ltype_length arguments in
-     if length = 1 then
-       ltype_cdr (ltype_car arguments)
-     else bad_arguments 1 length))]
+  [("+", two_ints_function ( + ));
+   ("-", two_ints_function ( - ));
+   ("*", two_ints_function ( * ));
+   ("/", two_ints_function ( / ));
+   ("=", two_arguments_function (fun f s -> LBool((int_of_ltype f) = (int_of_ltype s))));
+   ("cons", two_arguments_function (fun f s -> LCons(f, s)));
+   ("car", one_argument_function ltype_car);
+   ("cdr", one_argument_function ltype_cdr)]
 
 let rec repl () = begin
   let error str = print_endline ("Error: " ^ str) in
