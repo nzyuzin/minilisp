@@ -17,7 +17,7 @@ type ltype =
   | LCons of ltype * ltype
   | LIdentifier of string
   | LFunction of (ltype -> context -> ltype)
-and context = (string * ltype) list
+and context = (string * ltype) list ref
 
 let rec string_of_ltype =
   let rec nil_terminated = function
@@ -55,8 +55,9 @@ let is_string (x: string) =
   (x.[0] = '\'' && x.[length - 1] = '\'')
   || (x.[0] = '"' && x.[length - 1] = '"')
 
+let is_identifier str: bool = true
+
 let rec ltype_of_sexp (expression: string sexp): ltype =
-  let is_identifier str: bool = true in
   let rec ltype_of_sexp_list = function
     | [] -> LUnit
     | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs) in
@@ -96,27 +97,32 @@ let rec ltype_length = function
   | _ -> raise TypeError
 
 let rec lookup (ctxt: context) (name: string) : ltype option =
-  match ctxt with
+  match !ctxt with
   | [] -> None
-  | (name', value) :: xs -> if name = name' then (Some value) else lookup xs name
+  | (name', value) :: xs -> if name = name' then (Some value) else lookup (ref xs) name
 
 let extend_context (ctxt: context) (name: string) (value: ltype): context =
-  (name, value) :: ctxt
+  ref ((name, value) :: !ctxt)
+
+let unwrap_identifier = function
+  | LIdentifier(name) -> name
+  | _ -> raise TypeError
 
 let rec add_variables_to_context ctxt vars vals: context =
-  let unwrap_variable = function
-    | LIdentifier(name) -> name
-    | _ -> raise TypeError in
   match vars with
   | LUnit -> ctxt
   | LCons(var, rest) ->
-      let new_ctxt = extend_context ctxt (unwrap_variable var) (ltype_car vals) in
+      let new_ctxt = extend_context ctxt (unwrap_identifier var) (ltype_car vals) in
       add_variables_to_context new_ctxt rest (ltype_cdr vals)
   | _ -> raise TypeError
 
-let rec eval (expression: ltype) ctxt: ltype =
+let rec eval (ctxt: context) (expression: ltype): ltype =
   let validate_lambda = function
-    | LCons(lambda_args, LCons(lambda_body, LUnit)) when ltype_is_list lambda_args -> ()
+    | LCons(LIdentifier("lambda"), LCons(lambda_args, LCons(lambda_body, LUnit)))
+      when ltype_is_list lambda_args -> ()
+    | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
+  let validate_define = function
+    | LCons(LIdentifier("define"), LCons(identifier, body)) when is_identifier identifier -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   match expression with
   | LUnit -> LUnit
@@ -126,24 +132,34 @@ let rec eval (expression: ltype) ctxt: ltype =
     | Some value  -> value
     | None -> raise (UnboundValue v)
   end
-  | LCons(LIdentifier("lambda"), lambda) -> begin
+  | LCons(LIdentifier("lambda"), _) as lambda ->
     validate_lambda lambda;
-    let lambda_args = ltype_car lambda in
-    let lambda_body = ltype_car (ltype_cdr lambda) in
+    let lambda_args = ltype_car (ltype_cdr lambda) in
+    let lambda_body = ltype_car (ltype_cdr (ltype_cdr lambda)) in
     LFunction(fun args fctxt ->
       let provided_args_length = ltype_length args in
       let expected_args_length = ltype_length lambda_args in
       if provided_args_length != expected_args_length then
         raise (ArgumentsMismatch(expected_args_length, provided_args_length))
       else
-        eval lambda_body (add_variables_to_context ctxt lambda_args args))
-  end
+        eval (add_variables_to_context ctxt lambda_args args) lambda_body)
+  | LCons(LIdentifier("define"), _) as define ->
+    validate_define define;
+    let identifier = ltype_car (ltype_cdr define) in
+    let body = ltype_car (ltype_cdr (ltype_cdr define)) in
+    let unwrapped_identifier = unwrap_identifier identifier in
+    let ctxt_with_func_var = extend_context ctxt unwrapped_identifier identifier in
+    let evaled_body = eval ctxt_with_func_var body in
+    let new_ctxt = extend_context ctxt unwrapped_identifier evaled_body in
+    ctxt_with_func_var := !new_ctxt;
+    ctxt := !new_ctxt;
+    identifier
   | LCons(f, rest) -> apply ctxt f rest
   | LFunction(func) -> LFunction(func)
 
 and apply ctxt (f: ltype) (arguments: ltype): ltype =
-  let evaled_func = eval f ctxt in
-  let evaled_arguments: ltype = ltype_map arguments (fun x -> eval x ctxt) in
+  let evaled_func = eval ctxt f in
+  let evaled_arguments: ltype = ltype_map arguments (fun x -> eval ctxt x) in
   match evaled_func with
   | LFunction(func) -> func evaled_arguments ctxt
   | _ -> raise NotApplicable
@@ -204,7 +220,7 @@ let rec parse_input (source: unit -> string): string sexp =
 let check_arguments expected actual =
   raise (ArgumentsMismatch(expected, actual))
 
-let global_context: (string * ltype) list =
+let global_context: context = ref
   [("+", LFunction(fun arguments ctxt ->
      LInt(int_of_ltype(ltype_car arguments) + int_of_ltype(ltype_car (ltype_cdr arguments)))));
    ("cons", LFunction(fun arguments ctxt ->
@@ -252,7 +268,7 @@ let rec repl () = begin
       | Some parsed_sexp ->
         try
           let tokenized_input = ltype_of_sexp parsed_sexp in
-          let evaled_input = eval tokenized_input global_context in
+          let evaled_input = eval global_context tokenized_input in
           print_endline (";Value: " ^ (string_of_ltype evaled_input))
         with
           | NotApplicable -> error "Not applicable operation!"
@@ -272,7 +288,7 @@ end
 
 let dummy_sexp = (Sexp([Value("cons"); Value("1"); Value("2")]))
 let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), LUnit))))
-let test_sexp = eval (ltype_of_sexp dummy_sexp) global_context
+let test_sexp = eval global_context(ltype_of_sexp dummy_sexp)
 let test_cons = string_of_ltype test_sexp
 
 let _ =
