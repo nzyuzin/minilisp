@@ -6,6 +6,7 @@ exception UnboundValue of string
 exception CannotCast of string * string
 exception ArgumentsMismatch of int * int
 exception TypeError
+exception IllFormedSpecialForm of string
 
 type 'b sexp = Value of 'b | Sexp of 'b sexp list
 
@@ -70,6 +71,11 @@ let rec ltype_of_sexp (expression: string sexp): ltype =
     | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
   end
 
+let rec ltype_is_list = function
+  | LUnit -> true
+  | LCons(_, xs) -> ltype_is_list xs
+  | _ -> false
+
 let rec ltype_map l f =
   match l with
   | LUnit -> LUnit
@@ -94,10 +100,24 @@ let rec lookup (ctxt: context) (name: string) : ltype option =
   | [] -> None
   | (name', value) :: xs -> if name = name' then (Some value) else lookup xs name
 
-let rec extend_context (ctxt: context) (name: string) (value: ltype): context =
+let extend_context (ctxt: context) (name: string) (value: ltype): context =
   (name, value) :: ctxt
 
+let rec add_variables_to_context ctxt vars vals: context =
+  let unwrap_variable = function
+    | LIdentifier(name) -> name
+    | _ -> raise TypeError in
+  match vars with
+  | LUnit -> ctxt
+  | LCons(var, rest) ->
+      let new_ctxt = extend_context ctxt (unwrap_variable var) (ltype_car vals) in
+      add_variables_to_context new_ctxt rest (ltype_cdr vals)
+  | _ -> raise TypeError
+
 let rec eval (expression: ltype) ctxt: ltype =
+  let validate_lambda = function
+    | LCons(lambda_args, LCons(lambda_body, LUnit)) when ltype_is_list lambda_args -> ()
+    | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   match expression with
   | LUnit -> LUnit
   | LInt(_) as x -> x
@@ -105,6 +125,18 @@ let rec eval (expression: ltype) ctxt: ltype =
   | LIdentifier(v) -> begin match lookup ctxt v with
     | Some value  -> value
     | None -> raise (UnboundValue v)
+  end
+  | LCons(LIdentifier("lambda"), lambda) -> begin
+    validate_lambda lambda;
+    let lambda_args = ltype_car lambda in
+    let lambda_body = ltype_car (ltype_cdr lambda) in
+    LFunction(fun args fctxt ->
+      let provided_args_length = ltype_length args in
+      let expected_args_length = ltype_length lambda_args in
+      if provided_args_length != expected_args_length then
+        raise (ArgumentsMismatch(expected_args_length, provided_args_length))
+      else
+        eval lambda_body (add_variables_to_context ctxt lambda_args args))
   end
   | LCons(f, rest) -> apply ctxt f rest
   | LFunction(func) -> LFunction(func)
@@ -232,6 +264,7 @@ let rec repl () = begin
           arguments provided! Expected " ^ string_of_int expected ^ " but got "
           ^ string_of_int got ^ "!")
           | TypeError -> error ("The object is not of the correct type")
+          | IllFormedSpecialForm(text) -> error ("Ill-formed special form: " ^ text)
   end;
   print_endline "";
   repl ()
