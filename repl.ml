@@ -169,20 +169,20 @@ let global_context: (string * ltype) list =
        let s = lcons_of_list (List.tl arguments) in
        LCons(f, s)
      else check_arguments 2  length));
-    ("car", LFunction(fun arguments ->
-      let length = List.length arguments in
-      if length = 1 then
-        match List.hd arguments with
-        | LCons(f, s) -> f
-        | _ -> raise TypeError
-      else check_arguments 1 length));
-    ("cdr", LFunction(fun arguments ->
-      let length = List.length arguments in
-      if length = 1 then
-        match List.hd arguments with
-        | LCons(f, s) -> s
-        | _ -> raise TypeError
-      else check_arguments 1 length))]
+   ("car", LFunction(fun arguments ->
+     let length = List.length arguments in
+     if length = 1 then
+       match List.hd arguments with
+       | LCons(f, s) -> f
+       | _ -> raise TypeError
+     else check_arguments 1 length));
+   ("cdr", LFunction(fun arguments ->
+     let length = List.length arguments in
+     if length = 1 then
+       match List.hd arguments with
+       | LCons(f, s) -> s
+       | _ -> raise TypeError
+     else check_arguments 1 length))]
 
 let rec repl () = begin
   let error str = print_endline ("Error: " ^ str) in
