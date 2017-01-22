@@ -199,16 +199,12 @@ let global_context: (string * ltype) list =
    ("car", LFunction(fun arguments ctxt ->
      let length = ltype_length arguments in
      if length = 1 then
-       match ltype_car arguments with
-       | LCons(f, s) -> f
-       | _ -> raise TypeError
+       ltype_car (ltype_car arguments)
      else check_arguments 1 length));
    ("cdr", LFunction(fun arguments ctxt ->
      let length = ltype_length arguments in
      if length = 1 then
-       match ltype_car arguments with
-       | LCons(f, s) -> s
-       | _ -> raise TypeError
+       ltype_cdr (ltype_car arguments)
      else check_arguments 1 length))]
 
 let rec repl () = begin
