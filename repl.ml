@@ -104,30 +104,33 @@ let cdr = function
   | Nil -> raise EmptyCons
   | Cons(a, b) -> b
 
-let rec read_word str =
-  let length = String.length str in
-  let rec inner pos braces =
-    if pos = length then
-      if braces = 0 then ""
-      else raise NotMatchingBraces
-    else
-      let symbol = String.sub str pos 1 in
-      if symbol = " " && braces = 0 then ""
-      else if symbol = "(" then
-        symbol ^ inner (pos + 1) (braces + 1)
-      else if symbol = ")" then
-        symbol ^ inner (pos + 1) (braces - 1)
+let rec parse_input (source: unit -> string): string sexp =
+  let read_word (s: string): string =
+    let rec inner str braces =
+      let length = String.length str in
+      if length = 0 then
+        if braces = 0 then ""
+        else if braces > 0 then inner (" " ^ source ()) braces
+        else raise NotMatchingBraces
       else
-        symbol ^ inner (pos + 1) braces in
-  inner 0 0
-
-let rec parse_input input: string sexp =
-  let rec trim_head str =
-    let length = String.length str in
-    if length = 0 then str
-    else
-      if str.[0] = ' ' then trim_head (String.sub str 1 (length - 1))
-      else str in
+        let first_symbol = String.sub str 0 1 in
+        let rest = String.sub str 1 (length - 1) in
+        if first_symbol = " " && braces = 0 then ""
+        else if first_symbol = "(" then
+          first_symbol ^ inner rest (braces + 1)
+        else if first_symbol = ")" then
+          first_symbol ^ inner rest (braces - 1)
+        else
+          first_symbol ^ inner rest braces in
+    inner s 0 in
+  let trim str =
+    let rec trim_head str =
+      let length = String.length str in
+      if length = 0 then str
+      else
+        if str.[0] = ' ' then trim_head (String.sub str 1 (length - 1))
+        else str in
+    String.trim (trim_head str) in
   let rec parse_cons str: string sexp cons =
     let length = String.length str in
     if length = 0 || str = "()"
@@ -137,7 +140,7 @@ let rec parse_input input: string sexp =
       let word = read_word str in
       let word_length = String.length word in
       let after_word = String.sub str word_length (length - word_length) in
-      Cons(parse_sexp word, parse_cons (String.trim (trim_head after_word)))
+      Cons(parse_sexp word, parse_cons (trim after_word))
   and parse_sexp str: string sexp =
     let length = String.length str in
     let rec no_spaces s =
@@ -148,12 +151,12 @@ let rec parse_input input: string sexp =
       else no_spaces (String.sub s 1 (s_length - 1)) in
     if length = 0 then Sexp(Nil)
     else if str.[0] = '(' && str.[length - 1] = ')' then
-      Sexp(parse_cons (String.trim (trim_head (String.sub str 1 (length - 2)))))
+      Sexp(parse_cons (trim (String.sub str 1 (length - 2))))
     else if no_spaces str then
       Value(read_word str)
     else
       raise NotSexp in
-  parse_sexp (String.trim input)
+  parse_sexp (read_word (trim (source ())))
 
 
 let global_context: (string * lang_type) list =
@@ -167,13 +170,13 @@ let rec repl () = begin
     let parsed_input = ref None in
     let try_read =
       try
-        parsed_input := Some (parse_input (read_line ()))
+        parsed_input := Some (parse_input read_line)
       with
         | NotSexp -> error "Not an S-expression!"
         | NotMatchingBraces -> error "Not matching amount of braces!"
         | End_of_file -> begin
             print_endline "";
-            print_endline "Terminated by user";
+            print_endline "End of input stream reached.";
             exit 0;
           end in
     try_read;
@@ -186,7 +189,7 @@ let rec repl () = begin
       | Some parsed_sexp ->
         try
           let evaled_input = Value (eval parsed_sexp global_context) in
-          print_endline (string_of_sexp evaled_input string_of_lang_type)
+          print_endline (";Value: " ^ (string_of_sexp evaled_input string_of_lang_type))
         with
           | EmptyCons -> error "Empty cons!"
           | NotApplicable -> error "Not applicable operation!"
