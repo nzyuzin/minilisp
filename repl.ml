@@ -272,7 +272,7 @@ let global_context: context = ref
    ("cdr", one_argument_function ltype_cdr)]
 
 let rec repl () = begin
-  let error str = print_endline ("Error: " ^ str) in
+  let error str = prerr_endline ("Error: " ^ str) in
   let print_caret () = print_string "/> " in
   let read_line () = input_line stdin in
   let process_input (): string sexp option =
