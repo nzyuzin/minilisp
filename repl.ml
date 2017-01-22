@@ -23,8 +23,8 @@ type ltype =
   | LInt of int
   | LString of string
   | LCons of ltype * ltype
-  | LVariable of string
-  | LFunction of (ltype list -> context -> ltype)
+  | LIdentifier of string
+  | LFunction of (ltype -> context -> ltype)
 and context = (string * ltype) list
 
 let rec string_of_ltype =
@@ -42,7 +42,7 @@ let rec string_of_ltype =
   | LInt(i) -> string_of_int i
   | LString(s) -> s
   | LCons(c, d) as x -> "(" ^ string_of_lcons x ^ ")"
-  | LVariable(s) -> s
+  | LIdentifier(s) -> s
   | LFunction(_) -> "<function>"
 
 let rec lcons_of_list = function
@@ -68,6 +68,41 @@ let is_string (x: string) =
   (x.[0] = '\'' && x.[length - 1] = '\'')
   || (x.[0] = '"' && x.[length - 1] = '"')
 
+let rec ltype_of_sexp (expression: string sexp): ltype =
+  let is_identifier str: bool = true in
+  let rec ltype_of_sexp_list = function
+    | [] -> LUnit
+    | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs) in
+  match expression with
+  | Value(v) ->
+      if is_int v then LInt(int_of_string v)
+      else if is_string v then LString(v)
+      else if is_identifier v then LIdentifier(v)
+      else raise (Failure "Cannot convert sexp to ltype!")
+  | Sexp(c) -> begin match c with
+    | [] -> LUnit
+    | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
+  end
+
+let rec ltype_map l f =
+  match l with
+  | LUnit -> LUnit
+  | LCons(x, xs) -> LCons(f(x), ltype_map xs f)
+  | _ -> raise TypeError
+
+let ltype_car = function
+  | LCons(x, _) -> x
+  | _ -> raise TypeError
+
+let ltype_cdr = function
+  | LCons(_, xs) -> xs
+  | _ -> raise TypeError
+
+let rec ltype_length = function
+  | LUnit -> 0
+  | LCons(_, xs) -> 1 + ltype_length xs
+  | _ -> raise TypeError
+
 let rec lookup (ctxt: context) (name: string) : ltype option =
   match ctxt with
   | [] -> None
@@ -76,36 +111,21 @@ let rec lookup (ctxt: context) (name: string) : ltype option =
 let rec extend_context (ctxt: context) (name: string) (value: ltype): context =
   (name, value) :: ctxt
 
-let is_variable (x: string) ctxt = match lookup ctxt x with
-| Some(LVariable(_)) -> true
-| _ -> false
-
-let is_function (x: string) ctxt = match lookup ctxt x with
-| Some(LFunction(_)) -> true
-| _ -> false
-
-let is_lambda (x: string) ctxt = x = "lambda"
-
-let rec eval (expression: string sexp) ctxt: ltype =
-  let unwrap = function
-    | Some x -> x
-    | None -> raise (Failure "Unwrap on eval failed") in
+let rec eval (expression: ltype) ctxt: ltype =
   match expression with
-  | Value(v) ->
-      if is_int v then LInt(int_of_string v)
-      else if is_string v then LString(v)
-      else if is_variable v ctxt then unwrap (lookup ctxt v)
-      else if is_function v ctxt then unwrap (lookup ctxt v)
-      else if is_lambda v ctxt then LString("lambda")
-      else raise (UnboundValue v)
-  | Sexp(c) -> begin  match c with
-    | [] -> LUnit
-    | v :: rest -> apply v rest ctxt
+  | LUnit -> LUnit
+  | LInt(_) as x -> x
+  | LString(_) as x -> x
+  | LIdentifier(v) -> begin match lookup ctxt v with
+    | Some value  -> value
+    | None -> raise (UnboundValue v)
   end
+  | LCons(f, rest) -> apply ctxt f rest
+  | LFunction(func) -> LFunction(func)
 
-and apply (f: string sexp) (arguments: string sexp list) ctxt: ltype =
+and apply ctxt (f: ltype) (arguments: ltype): ltype =
   let evaled_func = eval f ctxt in
-  let evaled_arguments: ltype list = List.map (fun x -> eval x ctxt) arguments in
+  let evaled_arguments: ltype = ltype_map arguments (fun x -> eval x ctxt) in
   match evaled_func with
   | LFunction(func) -> func evaled_arguments ctxt
   | _ -> raise NotApplicable
@@ -168,25 +188,25 @@ let check_arguments expected actual =
 
 let global_context: (string * ltype) list =
   [("+", LFunction(fun arguments ctxt ->
-     LInt(int_of_ltype(List.hd arguments) + int_of_ltype(List.hd (List.tl arguments)))));
+     LInt(int_of_ltype(ltype_car arguments) + int_of_ltype(ltype_car (ltype_cdr arguments)))));
    ("cons", LFunction(fun arguments ctxt ->
-     let length = List.length arguments in
+     let length = ltype_length arguments in
      if length = 2 then
-       let f = List.hd arguments in
-       let s = lcons_of_list (List.tl arguments) in
+       let f = ltype_car arguments in
+       let s = ltype_car (ltype_cdr arguments) in
        LCons(f, s)
-     else check_arguments 2  length));
+     else check_arguments 2 length));
    ("car", LFunction(fun arguments ctxt ->
-     let length = List.length arguments in
+     let length = ltype_length arguments in
      if length = 1 then
-       match List.hd arguments with
+       match ltype_car arguments with
        | LCons(f, s) -> f
        | _ -> raise TypeError
      else check_arguments 1 length));
    ("cdr", LFunction(fun arguments ctxt ->
-     let length = List.length arguments in
+     let length = ltype_length arguments in
      if length = 1 then
-       match List.hd arguments with
+       match ltype_car arguments with
        | LCons(f, s) -> s
        | _ -> raise TypeError
      else check_arguments 1 length))]
@@ -217,7 +237,8 @@ let rec repl () = begin
       | None -> ();
       | Some parsed_sexp ->
         try
-          let evaled_input = eval parsed_sexp global_context in
+          let tokenized_input = ltype_of_sexp parsed_sexp in
+          let evaled_input = eval tokenized_input global_context in
           print_endline (";Value: " ^ (string_of_ltype evaled_input))
         with
           | NotApplicable -> error "Not applicable operation!"
@@ -234,8 +255,9 @@ let rec repl () = begin
   repl ()
 end
 
+let dummy_sexp = (Sexp([Value("cons"); Value("1"); Value("2")]))
 let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), LUnit))))
-let test_sexp = eval (Sexp([Value("cons"); Value("1"); Value("2")])) global_context
+let test_sexp = eval (ltype_of_sexp dummy_sexp) global_context
 let test_cons = string_of_ltype test_sexp
 
 let _ =
