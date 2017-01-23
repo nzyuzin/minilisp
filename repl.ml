@@ -150,7 +150,7 @@ let rec add_variables_to_context ctxt vars vals: context =
       add_variables_to_context new_ctxt rest (ltype_cdr vals)
   | _ -> raise TypeError
 
-let rec eval (ctxt: context) (expression: ltype): ltype =
+let rec eval (expression: ltype) (ctxt: context): ltype =
   let validate_if = function
     | LCons(LIdentifier("if"),
         LCons(predicate, LCons(then_branch, LCons(else_branch, LUnit)))) -> ()
@@ -172,14 +172,15 @@ let rec eval (ctxt: context) (expression: ltype): ltype =
     | Some value  -> value
     | None -> raise (UnboundValue v)
   end
+  | LFunction(func) -> LFunction(func)
   | LCons(LIdentifier("if"), _) as if_expression ->
     validate_if if_expression;
     let predicate = ltype_car (ltype_cdr if_expression) in
     let then_branch = ltype_car (ltype_cdr (ltype_cdr if_expression)) in
     let else_branch = ltype_car (ltype_cdr (ltype_cdr (ltype_cdr if_expression))) in
-    begin match (eval ctxt predicate) with
-      | LBool(true) -> eval ctxt then_branch
-      | LBool(false) -> eval ctxt else_branch
+    begin match (eval predicate ctxt) with
+      | LBool(true) -> eval then_branch ctxt
+      | LBool(false) -> eval else_branch ctxt
       | _ -> raise TypeError
     end
   | LCons(LIdentifier("lambda"), _) as lambda ->
@@ -192,24 +193,23 @@ let rec eval (ctxt: context) (expression: ltype): ltype =
       if provided_args_length != expected_args_length then
         raise (ArgumentsMismatch(expected_args_length, provided_args_length))
       else
-        eval (add_variables_to_context ctxt lambda_args args) lambda_body)
+        eval lambda_body (add_variables_to_context ctxt lambda_args args))
   | LCons(LIdentifier("define"), _) as define ->
     validate_define define;
     let identifier = ltype_car (ltype_cdr define) in
     let body = ltype_car (ltype_cdr (ltype_cdr define)) in
     let unwrapped_identifier = unwrap_identifier identifier in
     let ctxt_with_func_var = extend_context ctxt unwrapped_identifier identifier in
-    let evaled_body = eval ctxt_with_func_var body in
+    let evaled_body = eval body ctxt_with_func_var in
     let new_ctxt = extend_context ctxt unwrapped_identifier evaled_body in
     ctxt_with_func_var := !new_ctxt;
     ctxt := !new_ctxt;
     identifier
-  | LCons(f, rest) -> apply ctxt f rest
-  | LFunction(func) -> LFunction(func)
+  | LCons(f, rest) -> apply f rest ctxt
 
-and apply ctxt (f: ltype) (arguments: ltype): ltype =
-  let evaled_func = eval ctxt f in
-  let evaled_arguments: ltype = ltype_map arguments (fun x -> eval ctxt x) in
+and apply (f: ltype) (arguments: ltype) ctxt: ltype =
+  let evaled_func = eval f ctxt in
+  let evaled_arguments: ltype = ltype_map arguments (fun x -> eval x ctxt) in
   match evaled_func with
   | LFunction(func) -> func evaled_arguments ctxt
   | _ -> raise (NotApplicable (string_of_ltype f))
@@ -330,12 +330,12 @@ let global_context: context = ref
 
 let dummy_sexp = (Sexp([Value("cons"); Value("1"); Value("2")]))
 let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), LUnit))))
-let test_sexp = eval global_context(ltype_of_sexp dummy_sexp)
+let test_sexp = eval (ltype_of_sexp dummy_sexp) global_context
 let test_cons = string_of_ltype test_sexp
 let dummy_define_lambda = "(define fact (lambda (x) (if (= x 0) 1 (* x (fact (- x 1))))))"
 let dummy_define_lambda_sexp = parse_input (fun () -> dummy_define_lambda)
 let dummy_define_lambda_tokens = ltype_of_sexp dummy_define_lambda_sexp
-let test_define_lambda = eval global_context dummy_define_lambda_tokens
+let test_define_lambda = eval dummy_define_lambda_tokens global_context
 
 let _ =
   let error str = prerr_endline ("Error: " ^ str) in
@@ -364,7 +364,7 @@ let _ =
     | Some parsed_sexp ->
       try
         let tokenized_input = ltype_of_sexp parsed_sexp in
-        let evaled_input = eval global_context tokenized_input in
+        let evaled_input = eval tokenized_input global_context in
         if be_quiet then ()
         else print_endline (";Value: " ^ (string_of_ltype evaled_input))
       with
