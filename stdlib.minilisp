@@ -3,6 +3,11 @@
     (- 0 x)
     x)))
 
+(define remainder (lambda (num divisor)
+  (if (< num divisor)
+    num
+    (remainder (- num divisor) divisor))))
+
 (define cadr (lambda (c)
   (car (cdr c))))
 
