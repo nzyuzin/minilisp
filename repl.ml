@@ -1,13 +1,8 @@
-open Parser;;
-open Ltype;;
-open Evaluator;;
-open Primitives;;
-
 let error str = prerr_endline (";Error: " ^ str)
 let print_caret () = print_string "/> "
 let read_line () = input_line stdin
 
-let read source exit_on_eof: ltype option =
+let read source exit_on_eof: Ltype.ltype option =
   let parsed_input = ref None in
   let rec read_until_balance src already_read =
     let str = String.trim (Parser.remove_comments (src ())) in
@@ -22,11 +17,11 @@ let read source exit_on_eof: ltype option =
   let try_parse =
     try
       let input_str = read_until_balance source "" in
-      parsed_input := Some (parse_input input_str)
+      parsed_input := Some (Parser.parse_input input_str)
     with
-      | NotSexp str -> error ("Not an S-expression: " ^ str)
-      | NotMatchingBraces -> error "Not matching amount of braces."
-      | InvalidIdentifier str -> error ("Invalid identifier: " ^ str)
+      | Parser.NotSexp str -> error ("Not an S-expression: " ^ str)
+      | Parser.NotMatchingBraces -> error "Not matching amount of braces."
+      | Parser.InvalidIdentifier str -> error ("Invalid identifier: " ^ str)
       | End_of_file ->
           if exit_on_eof then begin
             print_endline "";
@@ -44,20 +39,20 @@ let eval_print parsing_result be_quiet =
   | None -> ();
   | Some tokenized_input ->
     try
-      let evaled_input = eval tokenized_input global_context in
+      let evaled_input = Evaluator.eval tokenized_input Primitives.global_context in
       if be_quiet then ()
-      else print_endline (";Value: " ^ (string_of_ltype evaled_input))
+      else print_endline (";Value: " ^ (Ltype.string_of_ltype evaled_input))
     with
-      | NotApplicable(str) -> error ("The object " ^ str ^ " is not applicable.")
-      | CannotEvaluate -> error "Expression cannot be evaluated."
-      | UnboundValue(s) -> error ("Unbound value: " ^ s)
-      | ArgumentsMismatch(expected, got) -> error ("Wrong number of "
+      | Evaluator.NotApplicable(str) -> error ("The object " ^ str ^ " is not applicable.")
+      | Evaluator.CannotEvaluate -> error "Expression cannot be evaluated."
+      | Evaluator.UnboundValue(s) -> error ("Unbound value: " ^ s)
+      | Evaluator.ArgumentsMismatch(expected, got) -> error ("Wrong number of "
           ^ "arguments provided: Expected " ^ string_of_int expected
           ^ " but got " ^ string_of_int got ^ "!")
-      | TypeError(actual, expected_type) ->
-          error ("The object " ^ (string_of_ltype actual)
+      | Ltype.TypeError(actual, expected_type) ->
+          error ("The object " ^ (Ltype.string_of_ltype actual)
             ^ " is not of expected type " ^ expected_type)
-      | IllFormedSpecialForm(text) -> error ("Ill-formed special form: " ^ text)
+      | Evaluator.IllFormedSpecialForm(text) -> error ("Ill-formed special form: " ^ text)
 
 let load_stdlib () =
   let stdlib_filename = "stdlib.minilisp" in

@@ -1,8 +1,7 @@
 open Ltype;;
-open Evaluator;;
 
 let bad_arguments expected actual =
-  raise (ArgumentsMismatch(expected, actual))
+  raise (Evaluator.ArgumentsMismatch (expected, actual))
 
 let one_argument_function f: ltype =
   LFunction(fun arguments ctxt ->

@@ -1,8 +1,4 @@
 open Ltype;;
-open Parser;;
-open Evaluator;;
-open Primitives;;
-open Repl;;
 
 exception TestFailed of string
 
@@ -14,13 +10,9 @@ let command_line_arguments = [
   ("-v", Arg.Bool(fun b -> verbose := b), "Print more information about tests")
 ]
 
-let dummy_sexp = (Sexp([Value("cons"); Value("1"); Value("2")]))
-let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), LUnit))))
-let test_sexp = eval (ltype_of_sexp dummy_sexp) global_context
-let test_cons = string_of_ltype test_sexp
 let dummy_define_lambda = "(define factorial (lambda (x) (if (= x 0) 1 (* x (factorial (- x 1))))))"
-let dummy_define_lambda_tokens = parse_input dummy_define_lambda
-let test_define_lambda = eval dummy_define_lambda_tokens global_context
+let dummy_define_lambda_tokens = Parser.parse_input dummy_define_lambda
+let test_define_lambda = Evaluator.eval dummy_define_lambda_tokens Primitives.global_context
 
 let test_expressions = [
   ("2", (LInt 2));
@@ -32,8 +24,8 @@ let test_expressions = [
 let completed_tests = ref (List.length test_expressions)
 
 let test (expression, expected_result): unit =
-  let parsed_input = parse_input expression in
-  let evaled_input = eval parsed_input global_context in
+  let parsed_input = Parser.parse_input expression in
+  let evaled_input = Evaluator.eval parsed_input Primitives.global_context in
   if evaled_input = expected_result then ()
   else begin
       print_endline ("Test failed on expression " ^ expression
@@ -60,5 +52,6 @@ let test_all () =
 
 let _ = begin
   Arg.parse command_line_arguments (fun x -> ()) ("Usage: " ^ Sys.argv.(0) ^ " [-v]");
+  Repl.load_stdlib ();
   test_all ()
 end

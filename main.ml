@@ -1,5 +1,3 @@
-open Repl;;
-
 let _ =
-  load_stdlib ();
-  repl ()
+  Repl.load_stdlib ();
+  Repl.repl ()
