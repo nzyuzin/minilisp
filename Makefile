@@ -1,2 +1,4 @@
+COMPILER = ocamlopt
+
 clean:
-	rm -f *.cmi *.cmo
+	rm -f *.cmi *.cmo *.cmx *.o
