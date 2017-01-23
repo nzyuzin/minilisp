@@ -3,7 +3,7 @@ open Ltype;;
 open Evaluator;;
 open Primitives;;
 
-let error str = prerr_endline ("Error: " ^ str)
+let error str = prerr_endline (";Error: " ^ str)
 let print_caret () = print_string "/> "
 let read_line () = input_line stdin
 
