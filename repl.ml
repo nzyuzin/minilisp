@@ -24,8 +24,9 @@ let read source exit_on_eof: ltype option =
       let input_str = read_until_balance source "" in
       parsed_input := Some (parse_input input_str)
     with
-      | NotSexp(str) -> error ("Not an S-expression: " ^ str ^ "!")
-      | NotMatchingBraces -> error "Not matching amount of braces!"
+      | NotSexp str -> error ("Not an S-expression: " ^ str)
+      | NotMatchingBraces -> error "Not matching amount of braces."
+      | InvalidIdentifier str -> error ("Invalid identifier: " ^ str)
       | End_of_file ->
           if exit_on_eof then begin
             print_endline "";
@@ -47,8 +48,8 @@ let eval_print parsing_result be_quiet =
       if be_quiet then ()
       else print_endline (";Value: " ^ (string_of_ltype evaled_input))
     with
-      | NotApplicable(str) -> error ("The object " ^ str ^ " is not applicable!")
-      | CannotEvaluate -> error "Expression cannot be evaluated!"
+      | NotApplicable(str) -> error ("The object " ^ str ^ " is not applicable.")
+      | CannotEvaluate -> error "Expression cannot be evaluated."
       | UnboundValue(s) -> error ("Unbound value: " ^ s)
       | ArgumentsMismatch(expected, got) -> error ("Wrong number of "
           ^ "arguments provided: Expected " ^ string_of_int expected

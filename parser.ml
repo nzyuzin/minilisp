@@ -2,6 +2,7 @@ open Ltype;;
 
 exception NotSexp of string
 exception NotMatchingBraces
+exception InvalidIdentifier of string
 
 type 'b sexp = Value of 'b | Sexp of 'b sexp list
 
@@ -19,7 +20,7 @@ let rec ltype_of_sexp (expression: string sexp): ltype =
       else if is_bool v then LBool(bool_of_ltype_string v)
       else if is_string v then LString(v)
       else if is_identifier v then LIdentifier(v)
-      else raise (Failure ("Cannot convert sexp to ltype: " ^ v))
+      else raise (InvalidIdentifier v)
   | Sexp(c) -> begin match c with
     | [] -> LUnit
     | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
