@@ -5,7 +5,27 @@ exception NotMatchingBraces
 
 type 'b sexp = Value of 'b | Sexp of 'b sexp list
 
-let rec parse_input (source: unit -> string): string sexp =
+let rec ltype_of_sexp (expression: string sexp): ltype =
+  let bool_of_ltype_string b =
+    if b = "#t" then true
+    else if b = "#f" then false
+    else raise (Failure (b ^ " is not bool")) in
+  let rec ltype_of_sexp_list = function
+    | [] -> LUnit
+    | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs) in
+  match expression with
+  | Value(v) ->
+      if is_int v then LInt(int_of_string v)
+      else if is_bool v then LBool(bool_of_ltype_string v)
+      else if is_string v then LString(v)
+      else if is_identifier v then LIdentifier(v)
+      else raise (Failure ("Cannot convert sexp to ltype: " ^ v))
+  | Sexp(c) -> begin match c with
+    | [] -> LUnit
+    | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
+  end
+
+let parse_input (source: unit -> string): ltype =
   let rec surround_braces str =
     let surround_with_spaces s =
       " " ^ s ^ " " in
@@ -74,25 +94,6 @@ let rec parse_input (source: unit -> string): string sexp =
       Value(read_word str)
     else
       raise (NotSexp str) in
-  parse_sexp (read_word (trim (surround_braces (source ()))))
-
-let rec ltype_of_sexp (expression: string sexp): ltype =
-  let bool_of_ltype_string b =
-    if b = "#t" then true
-    else if b = "#f" then false
-    else raise (Failure (b ^ " is not bool")) in
-  let rec ltype_of_sexp_list = function
-    | [] -> LUnit
-    | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs) in
-  match expression with
-  | Value(v) ->
-      if is_int v then LInt(int_of_string v)
-      else if is_bool v then LBool(bool_of_ltype_string v)
-      else if is_string v then LString(v)
-      else if is_identifier v then LIdentifier(v)
-      else raise (Failure ("Cannot convert sexp to ltype: " ^ v))
-  | Sexp(c) -> begin match c with
-    | [] -> LUnit
-    | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
-  end
+  let prepared_input = trim (surround_braces (source ())) in
+  ltype_of_sexp (parse_sexp (read_word prepared_input))
 

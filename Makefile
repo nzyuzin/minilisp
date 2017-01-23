@@ -1,9 +1,11 @@
 COMPILER = ocamlopt
 EXECUTABLE = minilisp
 MAIN = main.ml
-SOURCES = ltype.ml parser.ml evaluator.ml primitives.ml
+SOURCES = ltype.ml parser.ml evaluator.ml primitives.ml repl.ml
 TEST_SOURCES = test.ml
 TEST_EXECUTABLE = test
+
+.PHONY: test
 
 all: compile test
 
