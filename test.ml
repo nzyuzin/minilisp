@@ -19,19 +19,20 @@ let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), L
 let test_sexp = eval (ltype_of_sexp dummy_sexp) global_context
 let test_cons = string_of_ltype test_sexp
 let dummy_define_lambda = "(define factorial (lambda (x) (if (= x 0) 1 (* x (factorial (- x 1))))))"
-let dummy_define_lambda_tokens = parse_input (fun () -> dummy_define_lambda)
+let dummy_define_lambda_tokens = parse_input dummy_define_lambda
 let test_define_lambda = eval dummy_define_lambda_tokens global_context
 
 let test_expressions = [
   ("2", (LInt 2));
   ("(cons 1 2)", (LCons ((LInt 1), LInt(2))));
+  ("(cons 1 2) ; with comments!", (LCons ((LInt 1), LInt(2))));
   ("(factorial 5)", (LInt 120));
 ]
 
 let completed_tests = ref (List.length test_expressions)
 
 let test (expression, expected_result): unit =
-  let parsed_input = parse_input (fun () -> expression) in
+  let parsed_input = parse_input expression in
   let evaled_input = eval parsed_input global_context in
   if evaled_input = expected_result then ()
   else begin

@@ -9,9 +9,20 @@ let read_line () = input_line stdin
 
 let read source exit_on_eof: ltype option =
   let parsed_input = ref None in
-  let try_read =
+  let rec read_until_balance src already_read =
+    let str = String.trim (Parser.remove_comments (src ())) in
+    if String.length str = 0 then
+      read_until_balance src already_read
+    else
+      let new_read = already_read ^ str in
+      if Parser.balanced_braces new_read then
+        new_read
+      else
+        read_until_balance src new_read in
+  let try_parse =
     try
-      parsed_input := Some (parse_input source)
+      let input_str = read_until_balance source "" in
+      parsed_input := Some (parse_input input_str)
     with
       | NotSexp(str) -> error ("Not an S-expression: " ^ str ^ "!")
       | NotMatchingBraces -> error "Not matching amount of braces!"
@@ -23,7 +34,7 @@ let read source exit_on_eof: ltype option =
           end
           else raise End_of_file in
   begin
-    try_read;
+    try_parse;
     !parsed_input
   end
 

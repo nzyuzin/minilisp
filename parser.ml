@@ -25,7 +25,22 @@ let rec ltype_of_sexp (expression: string sexp): ltype =
     | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
   end
 
-let parse_input (source: unit -> string): ltype =
+let remove_comments str =
+  let com_pos = try String.index str ';' with Not_found -> -1 in
+  if com_pos != -1 then
+    String.sub str 0 com_pos
+  else
+    str
+
+let balanced_braces s =
+  let rec inner pos balance =
+    if pos = String.length s then balance
+    else if s.[pos] = '(' then inner (pos + 1) (balance + 1)
+    else if s.[pos] = ')' then inner (pos + 1) (balance - 1)
+    else inner (pos + 1) balance in
+  inner 0 0 = 0
+
+let parse_input (source: string): ltype =
   let rec surround_braces str =
     let surround_with_spaces s =
       " " ^ s ^ " " in
@@ -42,7 +57,6 @@ let parse_input (source: unit -> string): ltype =
       let length = String.length str in
       if length = 0 then
         if braces = 0 then ""
-        else if braces > 0 then inner (" " ^ source ()) braces
         else raise NotMatchingBraces
       else
         let first_symbol = String.sub str 0 1 in
@@ -56,13 +70,7 @@ let parse_input (source: unit -> string): ltype =
           first_symbol ^ inner rest braces in
     inner s 0 in
   let trim str =
-    let rec trim_head str =
-      let length = String.length str in
-      if length = 0 then str
-      else
-        if str.[0] = ' ' then trim_head (after_first_char str)
-        else str in
-    String.trim (trim_head str) in
+    String.trim str in
   let rec parse_cons str: string sexp list =
     let length = String.length str in
     if length = 0 then []
@@ -80,13 +88,6 @@ let parse_input (source: unit -> string): ltype =
         true
       else if s.[0] = ' ' then false
       else no_spaces (after_first_char s) in
-    let balanced_braces s =
-      let rec inner pos balance =
-        if pos = String.length s then balance
-        else if s.[pos] = '(' then inner (pos + 1) (balance + 1)
-        else if s.[pos] = ')' then inner (pos + 1) (balance - 1)
-        else inner (pos + 1) balance in
-      inner 0 0 = 0 in
     if length = 0 then Sexp([])
     else if str.[0] = '(' && str.[length - 1] = ')' && balanced_braces str then
       Sexp(parse_cons (trim (String.sub str 1 (length - 2))))
@@ -94,6 +95,6 @@ let parse_input (source: unit -> string): ltype =
       Value(read_word str)
     else
       raise (NotSexp str) in
-  let prepared_input = trim (surround_braces (source ())) in
+  let prepared_input = trim (surround_braces (remove_comments source)) in
   ltype_of_sexp (parse_sexp (read_word prepared_input))
 
