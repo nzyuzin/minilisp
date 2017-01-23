@@ -215,6 +215,17 @@ and apply ctxt (f: ltype) (arguments: ltype): ltype =
   | _ -> raise (NotApplicable (string_of_ltype f))
 
 let rec parse_input (source: unit -> string): string sexp =
+  let rec surround_braces str =
+    let surround_with_spaces s =
+      " " ^ s ^ " " in
+    if String.length str = 0 then
+      str
+    else
+      let first_symbol = String.sub str 0 1 in
+      if first_symbol = "(" || first_symbol = ")" then
+        (surround_with_spaces first_symbol) ^ surround_braces (after_first_char str)
+      else
+        first_symbol ^ surround_braces (after_first_char str) in
   let read_word (s: string): string =
     let rec inner str braces =
       let length = String.length str in
@@ -258,14 +269,21 @@ let rec parse_input (source: unit -> string): string sexp =
         true
       else if s.[0] = ' ' then false
       else no_spaces (after_first_char s) in
+    let balanced_braces s =
+      let rec inner pos balance =
+        if pos = String.length s then balance
+        else if s.[pos] = '(' then inner (pos + 1) (balance + 1)
+        else if s.[pos] = ')' then inner (pos + 1) (balance - 1)
+        else inner (pos + 1) balance in
+      inner 0 0 = 0 in
     if length = 0 then Sexp([])
-    else if str.[0] = '(' && str.[length - 1] = ')' then
+    else if str.[0] = '(' && str.[length - 1] = ')' && balanced_braces str then
       Sexp(parse_cons (trim (String.sub str 1 (length - 2))))
     else if no_spaces str then
       Value(read_word str)
     else
       raise (NotSexp str) in
-  parse_sexp (read_word (trim (source ())))
+  parse_sexp (read_word (trim (surround_braces (source ()))))
 
 let bad_arguments expected actual =
   raise (ArgumentsMismatch(expected, actual))
