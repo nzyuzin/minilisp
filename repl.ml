@@ -1,4 +1,4 @@
-exception NotSexp
+exception NotSexp of string
 exception NotMatchingBraces
 exception NotApplicable of string
 exception CannotEvaluate
@@ -250,7 +250,7 @@ let rec parse_input (source: unit -> string): string sexp =
       let word_length = String.length word in
       let after_word = String.sub str word_length (length - word_length) in
       parse_sexp word :: parse_cons (trim after_word)
-  and parse_sexp str: string sexp =
+  and parse_sexp (str: string): string sexp =
     let length = String.length str in
     let rec no_spaces s =
       let s_length = String.length s in
@@ -264,7 +264,7 @@ let rec parse_input (source: unit -> string): string sexp =
     else if no_spaces str then
       Value(read_word str)
     else
-      raise NotSexp in
+      raise (NotSexp str) in
   parse_sexp (read_word (trim (source ())))
 
 let bad_arguments expected actual =
@@ -329,7 +329,7 @@ let _ =
       try
         parsed_input := Some (parse_input source)
       with
-        | NotSexp -> error "Not an S-expression!"
+        | NotSexp(str) -> error ("Not an S-expression: " ^ str ^ "!")
         | NotMatchingBraces -> error "Not matching amount of braces!"
         | End_of_file ->
             if exit_on_eof then begin
