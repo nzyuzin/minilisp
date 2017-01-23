@@ -267,54 +267,16 @@ let global_context: context = ref
    ("*", two_ints_function ( * ));
    ("/", two_ints_function ( / ));
    ("=", two_arguments_function (fun f s -> LBool((int_of_ltype f) = (int_of_ltype s))));
+   ("<", two_arguments_function (fun f s -> LBool((int_of_ltype f) < (int_of_ltype s))));
+   ("<=", two_arguments_function (fun f s -> LBool((int_of_ltype f) <= (int_of_ltype s))));
+   (">", two_arguments_function (fun f s -> LBool((int_of_ltype f) > (int_of_ltype s))));
+   (">=", two_arguments_function (fun f s -> LBool((int_of_ltype f) >= (int_of_ltype s))));
    ("cons", two_arguments_function (fun f s -> LCons(f, s)));
    ("car", one_argument_function ltype_car);
-   ("cdr", one_argument_function ltype_cdr)]
+   ("cdr", one_argument_function ltype_cdr);
+   ("nil?", one_argument_function (fun x -> LBool(x = LUnit)));
+   ("list", LFunction(fun arguments ctxt -> arguments))]
 
-let rec repl () = begin
-  let error str = prerr_endline ("Error: " ^ str) in
-  let print_caret () = print_string "/> " in
-  let read_line () = input_line stdin in
-  let process_input (): string sexp option =
-    let parsed_input = ref None in
-    let try_read =
-      try
-        parsed_input := Some (parse_input read_line)
-      with
-        | NotSexp -> error "Not an S-expression!"
-        | NotMatchingBraces -> error "Not matching amount of braces!"
-        | End_of_file -> begin
-            print_endline "";
-            print_endline "End of input stream reached.";
-            exit 0;
-          end in
-    try_read;
-    !parsed_input in
-  print_caret ();
-  flush stdout;
-  begin
-    match process_input () with
-      | None -> ();
-      | Some parsed_sexp ->
-        try
-          let tokenized_input = ltype_of_sexp parsed_sexp in
-          let evaled_input = eval global_context tokenized_input in
-          print_endline (";Value: " ^ (string_of_ltype evaled_input))
-        with
-          | NotApplicable -> error "Not applicable operation!"
-          | CannotEvaluate -> error "Expression cannot be evaluated!"
-          | CannotCast(value, to_type) ->
-              error ("Cannot cast " ^ value ^ " to type " ^ to_type ^ "!")
-          | UnboundValue(s) -> error ("Unbound value: " ^ s)
-          | ArgumentsMismatch(expected, got) -> error ("Wrong number of "
-          ^ "arguments provided: Expected " ^ string_of_int expected
-          ^ " but got " ^ string_of_int got ^ "!")
-          | TypeError -> error ("The object is not of the correct type")
-          | IllFormedSpecialForm(text) -> error ("Ill-formed special form: " ^ text)
-  end;
-  print_endline "";
-  repl ()
-end
 
 let dummy_sexp = (Sexp([Value("cons"); Value("1"); Value("2")]))
 let test_ltype = string_of_ltype (LCons(LInt(1), LCons(LInt(2), LCons(LInt(3), LUnit))))
@@ -326,4 +288,66 @@ let dummy_define_lambda_tokens = ltype_of_sexp dummy_define_lambda_sexp
 let test_define_lambda = eval global_context dummy_define_lambda_tokens
 
 let _ =
+  let error str = prerr_endline ("Error: " ^ str) in
+  let print_caret () = print_string "/> " in
+  let read_line () = input_line stdin in
+  let read source exit_on_eof: string sexp option =
+    let parsed_input = ref None in
+    let try_read =
+      try
+        parsed_input := Some (parse_input source)
+      with
+        | NotSexp -> error "Not an S-expression!"
+        | NotMatchingBraces -> error "Not matching amount of braces!"
+        | End_of_file ->
+            if exit_on_eof then begin
+              print_endline "";
+              print_endline "End of input stream reached.";
+              exit 0;
+            end
+            else raise End_of_file in
+    try_read;
+    !parsed_input in
+  let eval_print parsing_result be_quiet =
+    match parsing_result with
+    | None -> ();
+    | Some parsed_sexp ->
+      try
+        let tokenized_input = ltype_of_sexp parsed_sexp in
+        let evaled_input = eval global_context tokenized_input in
+        if be_quiet then ()
+        else print_endline (";Value: " ^ (string_of_ltype evaled_input))
+      with
+        | NotApplicable -> error "Not applicable operation!"
+        | CannotEvaluate -> error "Expression cannot be evaluated!"
+        | CannotCast(value, to_type) ->
+            error ("Cannot cast " ^ value ^ " to type " ^ to_type ^ "!")
+        | UnboundValue(s) -> error ("Unbound value: " ^ s)
+        | ArgumentsMismatch(expected, got) -> error ("Wrong number of "
+            ^ "arguments provided: Expected " ^ string_of_int expected
+            ^ " but got " ^ string_of_int got ^ "!")
+        | TypeError -> error ("The object is not of the correct type")
+        | IllFormedSpecialForm(text) -> error ("Ill-formed special form: " ^ text) in
+  let load_stdlib () =
+    let stdlib_filename = "stdlib.minilisp" in
+    let rec eval_whole_file source =
+      try
+        eval_print (read source false) true;
+        eval_whole_file source
+      with
+        | End_of_file -> () in
+    if Sys.file_exists stdlib_filename then
+      let input = open_in stdlib_filename in
+      eval_whole_file (fun () -> input_line input);
+      close_in input
+    else
+      () in
+  let rec repl () = begin
+    print_caret ();
+    flush stdout;
+    eval_print (read read_line true) false;
+    print_endline "";
+    repl ()
+  end in
+  load_stdlib ();
   repl ()
