@@ -1,6 +1,6 @@
 exception NotSexp
 exception NotMatchingBraces
-exception NotApplicable
+exception NotApplicable of string
 exception CannotEvaluate
 exception UnboundValue of string
 exception CannotCast of string * string
@@ -39,17 +39,48 @@ let rec string_of_ltype =
   | LIdentifier(s) -> s
   | LFunction(_) -> "<function>"
 
-let is_identifier str: bool = true
+let after_first_char str =
+  String.sub str 1 (String.length str - 1)
+
+let inside_char_bounds chr f s =
+  let code = Char.code chr in
+  code >= (Char.code f) && code <= (Char.code s)
+
+let is_digit chr =
+  inside_char_bounds chr '0' '9'
+
+let is_alpha chr =
+  (inside_char_bounds chr 'a' 'z') || (inside_char_bounds chr 'A' 'Z')
+
+let is_alphanum chr =
+  is_digit chr || is_alpha chr
+
+let is_identifier str: bool =
+  let allowed_symbols = "_-?!*/+=<>@$%^:~" in
+  let is_allowed_symbol chr =
+    is_alphanum chr || String.contains allowed_symbols chr in
+  let rec contains_only_allowed s =
+    if String.length s = 0 then false
+    else if String.length s = 1 then is_allowed_symbol s.[0]
+    else is_allowed_symbol s.[0] && contains_only_allowed (after_first_char s) in
+  let is_allowed_first_char chr =
+    (not (is_digit chr)) && is_allowed_symbol chr in
+  let length = String.length str in
+  if length = 0 then false
+  else if length = 1 then is_allowed_first_char str.[0]
+  else is_allowed_first_char str.[0] && contains_only_allowed(after_first_char str)
 
 let rec ltype_of_sexp (expression: string sexp): ltype =
-  let rec is_int (x: string) =
-    let is_digit c =
-      let code = Char.code c in
-      code >= (Char.code '0') && code <= (Char.code '9') in
-    let length = String.length x in
-    if length = 0 then false
-    else if length = 1 then is_digit x.[0]
-    else is_digit x.[0] && is_int (String.sub x 1 (length - 1)) in
+  let rec is_int (str: string) =
+    let rec is_digits s =
+      let length = String.length s in
+      if length = 0 then false
+      else if length = 1 then is_digit s.[0]
+      else is_digit s.[0] && is_digits (after_first_char s) in
+    if str.[0] = '-' && String.length str > 1 then
+      is_digits (after_first_char str)
+    else
+      is_digits str in
   let is_bool (x: string) =
     x = "#t" || x = "#f" in
   let is_string (x: string) =
@@ -69,7 +100,7 @@ let rec ltype_of_sexp (expression: string sexp): ltype =
       else if is_bool v then LBool(bool_of_ltype_string v)
       else if is_string v then LString(v)
       else if is_identifier v then LIdentifier(v)
-      else raise (Failure "Cannot convert sexp to ltype!")
+      else raise (Failure ("Cannot convert sexp to ltype: " ^ v))
   | Sexp(c) -> begin match c with
     | [] -> LUnit
     | x :: xs -> LCons(ltype_of_sexp x, ltype_of_sexp_list xs)
@@ -129,7 +160,8 @@ let rec eval (ctxt: context) (expression: ltype): ltype =
       when ltype_is_list lambda_args -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   let validate_define = function
-    | LCons(LIdentifier("define"), LCons(identifier, body)) when is_identifier identifier -> ()
+    | LCons(LIdentifier("define"), LCons(identifier, body))
+      when is_identifier (unwrap_identifier identifier) -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   match expression with
   | LUnit -> LUnit
@@ -180,7 +212,7 @@ and apply ctxt (f: ltype) (arguments: ltype): ltype =
   let evaled_arguments: ltype = ltype_map arguments (fun x -> eval ctxt x) in
   match evaled_func with
   | LFunction(func) -> func evaled_arguments ctxt
-  | _ -> raise NotApplicable
+  | _ -> raise (NotApplicable (string_of_ltype f))
 
 let rec parse_input (source: unit -> string): string sexp =
   let read_word (s: string): string =
@@ -192,7 +224,7 @@ let rec parse_input (source: unit -> string): string sexp =
         else raise NotMatchingBraces
       else
         let first_symbol = String.sub str 0 1 in
-        let rest = String.sub str 1 (length - 1) in
+        let rest = after_first_char str in
         if first_symbol = " " && braces = 0 then ""
         else if first_symbol = "(" then
           first_symbol ^ inner rest (braces + 1)
@@ -206,7 +238,7 @@ let rec parse_input (source: unit -> string): string sexp =
       let length = String.length str in
       if length = 0 then str
       else
-        if str.[0] = ' ' then trim_head (String.sub str 1 (length - 1))
+        if str.[0] = ' ' then trim_head (after_first_char str)
         else str in
     String.trim (trim_head str) in
   let rec parse_cons str: string sexp list =
@@ -225,7 +257,7 @@ let rec parse_input (source: unit -> string): string sexp =
       if s_length = 0 then
         true
       else if s.[0] = ' ' then false
-      else no_spaces (String.sub s 1 (s_length - 1)) in
+      else no_spaces (after_first_char s) in
     if length = 0 then Sexp([])
     else if str.[0] = '(' && str.[length - 1] = ')' then
       Sexp(parse_cons (trim (String.sub str 1 (length - 2))))
@@ -318,7 +350,7 @@ let _ =
         if be_quiet then ()
         else print_endline (";Value: " ^ (string_of_ltype evaled_input))
       with
-        | NotApplicable -> error "Not applicable operation!"
+        | NotApplicable(str) -> error ("The object " ^ str ^ " is not applicable!")
         | CannotEvaluate -> error "Expression cannot be evaluated!"
         | CannotCast(value, to_type) ->
             error ("Cannot cast " ^ value ^ " to type " ^ to_type ^ "!")
