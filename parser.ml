@@ -1,4 +1,4 @@
-open Ltype;;
+open Ltype
 
 exception NotSexp of string
 exception NotMatchingBraces

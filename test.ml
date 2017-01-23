@@ -1,4 +1,4 @@
-open Ltype;;
+open Ltype
 
 exception TestFailed of string
 

@@ -1,4 +1,4 @@
-open Ltype;;
+open Ltype
 
 exception IllFormedSpecialForm of string
 exception CannotEvaluate

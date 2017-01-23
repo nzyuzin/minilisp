@@ -1,4 +1,4 @@
-open Ltype;;
+open Ltype
 
 let bad_arguments expected actual =
   raise (Evaluator.ArgumentsMismatch (expected, actual))
