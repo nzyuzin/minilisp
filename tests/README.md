@@ -10,11 +10,13 @@ expected evaluation result of the last line.
 
 Example of a test file:
 
+```scheme
 ; 42 ; we expect this value to be result of a program
 
 (define id (lambda (x) x)) ; regular definition
 
 (id 42) ; Last line of the text file, it should be evaluated to 42
+```
 
 Running the tests
 -----------------
