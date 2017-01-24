@@ -19,7 +19,7 @@ let rec ltype_of_sexp (expression: string sexp): ltype =
       if is_int v then LInt(int_of_string v)
       else if is_bool v then LBool(bool_of_ltype_string v)
       else if is_string v then LString(v)
-      else if is_identifier v then LIdentifier(v)
+      else if is_identifier v then LIdentifier(String.lowercase_ascii v)
       else raise (InvalidIdentifier v)
   | Sexp(c) -> begin match c with
     | [] -> LUnit
