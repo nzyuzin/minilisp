@@ -64,9 +64,9 @@ let is_string (x: string) =
   x.[0] = '"' && x.[length - 1] = '"'
 
 let is_identifier str: bool =
-  let allowed_symbols = "_-?!*/+=<>@$%^:~" in
+  let extended_alphabetic_characters = "!$%&*+-./:<=>?@^_~" in
   let is_allowed_symbol chr =
-    is_alphanum chr || String.contains allowed_symbols chr in
+    is_alphanum chr || String.contains extended_alphabetic_characters chr in
   let rec contains_only_allowed s =
     if String.length s = 0 then false
     else if String.length s = 1 then is_allowed_symbol s.[0]
