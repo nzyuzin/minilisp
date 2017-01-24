@@ -10,9 +10,23 @@ if [ ! -f "./test" ]; then
   exit 2
 fi
 
-for test_file in $(ls tests); do
-  echo "Running test on $test_file:"
-  result="$(head -1 tests/$test_file | sed 's/;//')"
-  ./test $@ "tests/$test_file" $result
+TEST_FILES=$(ls tests/*.minilisp)
+
+TESTS_NUMBER="$(wc -w <<< $TEST_FILES | sed 's/[^1-9]//g')"
+passed_tests=0
+
+for test_file in $TEST_FILES; do
+  expected_result="$(head -1 $test_file | sed 's/;//')"
+  result="$(./test $@ "$test_file" $expected_result)"
+  if [ $result = "true" ]; then
+    passed_tests=$(($passed_tests + 1))
+  else
+    echo "Test $test_file failed!"
+  fi
 done
 
+if [ $passed_tests -eq $TESTS_NUMBER ]; then
+  echo "$0: All tests passed!"
+else
+  echo "$0: Testing finished: $passed_tests out of $TESTS_NUMBER tests passed!"
+fi

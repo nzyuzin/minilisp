@@ -20,7 +20,7 @@ compile:
 	$(COMPILER) -o $(EXECUTABLE) $(SOURCES) $(MAIN)
 
 test:
-	$(COMPILER) -o $(TEST_EXECUTABLE) -g $(SOURCES) $(TEST_SOURCES) && ./test
+	$(COMPILER) -o $(TEST_EXECUTABLE) -g $(SOURCES) $(TEST_SOURCES) && ./test && ./run_all_tests
 
 debug: test
 	$(COMPILER) -o $(EXECUTABLE) -g $(SOURCES) $(MAIN)
