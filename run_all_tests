@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+if [ ! -d tests ]; then
+  echo 'Directory tests not found!'
+  exit 1
+fi
+
+if [ ! -f "./test" ]; then
+  echo "Executable test not found!"
+  exit 2
+fi
+
+for test_file in $(ls tests); do
+  echo "Running test on $test_file:"
+  result="$(head -1 tests/$test_file | sed 's/;//')"
+  ./test $@ "tests/$test_file" $result
+done
+

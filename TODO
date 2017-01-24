@@ -1,0 +1,1 @@
+Primitives.global_context should return new context each time. It will help to avoid having undesirable pollution of global context between runs
