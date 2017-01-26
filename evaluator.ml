@@ -40,19 +40,36 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
       | LBool(false) -> eval else_branch ctxt
       | x -> raise (TypeError (x, "bool")) in
   let validate_define = function
+    | LCons(LIdentifier("define"), LCons(LCons(func_name, func_args), body))
+      when is_identifier (unwrap_identifier func_name) -> ()
     | LCons(LIdentifier("define"), LCons(identifier, body))
       when is_identifier (unwrap_identifier identifier) -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
-  let eval_define define =
-    let identifier = ltype_car (ltype_cdr define) in
-    let body = ltype_car (ltype_cdr (ltype_cdr define)) in
-    let unwrapped_identifier = unwrap_identifier identifier in
-    let ctxt_with_func_var = extend_context ctxt unwrapped_identifier identifier in
-    let evaled_body = eval body ctxt_with_func_var in
-    let new_ctxt = extend_context ctxt unwrapped_identifier evaled_body in
-    ctxt_with_func_var := !new_ctxt;
-    ctxt := !new_ctxt;
-    identifier in
+  let eval_define dfn =
+    let is_define_function = function
+      | LCons(_, LCons(LCons(LIdentifier(_), _), _)) -> true
+      | _ -> false in
+    let eval_define_variable define =
+      let identifier = ltype_car (ltype_cdr define) in
+      let body = ltype_car (ltype_cdr (ltype_cdr define)) in
+      let unwrapped_identifier = unwrap_identifier identifier in
+      let ctxt_with_func_var = extend_context ctxt unwrapped_identifier identifier in
+      let evaled_body = eval body ctxt_with_func_var in
+      let new_ctxt = extend_context ctxt unwrapped_identifier evaled_body in
+      ctxt_with_func_var := !new_ctxt;
+      ctxt := !new_ctxt;
+      identifier in
+    let eval_define_function define =
+      let func_name = ltype_car (ltype_car (ltype_cdr define)) in
+      let fun_args = ltype_cdr (ltype_car (ltype_cdr define)) in
+      let fun_body = ltype_car (ltype_cdr (ltype_cdr define)) in
+      (* transforms (define (f args) body) to (define f (lambda (args) body)) *)
+      let lambda_transformation =
+        LCons(LIdentifier("define"), LCons(LIdentifier(unwrap_identifier func_name), LCons(
+          LCons(LIdentifier("lambda"), LCons(fun_args, LCons(fun_body, LUnit))), LUnit))) in
+      eval_define_variable lambda_transformation in
+    if is_define_function dfn then eval_define_function dfn
+    else eval_define_variable dfn in
   let validate_lambda = function
     | LCons(LIdentifier("lambda"), LCons(lambda_args, LCons(lambda_body, LUnit)))
       when ltype_is_list lambda_args -> ()

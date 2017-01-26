@@ -8,6 +8,8 @@
     num
     (remainder (- num divisor) divisor))))
 
+(define (square x) (* x x))
+
 (define cadr (lambda (c)
   (car (cdr c))))
 

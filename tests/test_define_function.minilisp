@@ -1,0 +1,5 @@
+; 225
+
+(define (my-square x) (* x x))
+
+(my-square 15)
