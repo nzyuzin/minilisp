@@ -1,42 +1,42 @@
-(define abs (lambda (x)
+(define (abs x)
   (if (< x 0)
     (- 0 x)
-    x)))
+    x))
 
-(define remainder (lambda (num divisor)
+(define (remainder num divisor)
   (if (< num divisor)
     num
-    (remainder (- num divisor) divisor))))
+    (remainder (- num divisor) divisor)))
 
 (define (square x) (* x x))
 
-(define cadr (lambda (c)
-  (car (cdr c))))
+(define (cadr c)
+  (car (cdr c)))
 
-(define cddr (lambda (c)
-  (cdr (cdr c))))
+(define (cddr c)
+  (cdr (cdr c)))
 
-(define length (lambda (lst)
+(define (length lst)
   (if (nil? lst)
     0
-    (+ 1 (length (cdr lst))))))
+    (+ 1 (length (cdr lst)))))
 
-(define append (lambda (el lst)
-  (cons el lst)))
+(define (append el lst)
+  (cons el lst))
 
-(define map (lambda (f lst)
+(define (map f lst)
   (if (nil? lst)
     ()
-    (cons (f (car lst)) (map f (cdr lst))))))
+    (cons (f (car lst)) (map f (cdr lst)))))
 
-(define filter (lambda (predicate lst)
+(define (filter predicate lst)
   (if (nil? lst)
     ()
     (if (predicate (car lst))
       (cons (car lst) (filter predicate (cdr lst)))
-      (filter predicate (cdr lst))))))
+      (filter predicate (cdr lst)))))
 
-(define fold-right (lambda (combinator initial-value lst)
+(define (fold-right combinator initial-value lst)
   (if (nil? lst)
     initial-value
-    (combinator (car lst) (fold-right combinator initial-value (cdr lst))))))
+    (combinator (car lst) (fold-right combinator initial-value (cdr lst)))))
