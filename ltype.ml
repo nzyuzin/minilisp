@@ -89,6 +89,18 @@ let rec ltype_map l f =
   | LCons(x, xs) -> LCons(f(x), ltype_map xs f)
   | x -> raise (TypeError (x, "list"))
 
+let rec ltype_foldr f l i =
+  match l with
+  | LUnit -> i
+  | LCons(el, rest) -> f el (ltype_foldr f rest i)
+  | x -> raise (TypeError (x, "list"))
+
+let rec ltype_foldl f l i =
+  match l with
+  | LUnit -> i
+  | LCons(el, rest) -> ltype_foldl f rest (f i el)
+  | x -> raise (TypeError (x, "list"))
+
 let ltype_car = function
   | LCons(x, _) -> x
   | x -> raise (TypeError (x, "cons"))
