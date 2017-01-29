@@ -69,7 +69,7 @@ let global_context: context = ref
     ("cdr", one_argument_function ltype_cdr);
     ("null?", one_argument_function (fun x -> LBool(x = LUnit)));
     ("list", LFunction(fun arguments ctxt -> arguments));
-    ("display", one_argument_function (fun lstr -> print_endline (string_of_ltype lstr); LUnit));
+    ("display", one_argument_function (fun lstr -> print_string (string_of_ltype lstr); LUnit));
     ("newline", zero_or_one_argument_function (fun x -> print_endline ""; LUnit));
     ("exit", zero_or_one_argument_function (function
                                             | None -> exit 0
