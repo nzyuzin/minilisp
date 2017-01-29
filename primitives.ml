@@ -47,10 +47,6 @@ let two_arguments_function (func : 'a -> 'b -> ltype): ltype =
     let s = ltype_car (ltype_cdr arguments) in
     func f s)
 
-let int_of_ltype = function
-  | LInt(i) -> i
-  | v -> raise (TypeError (v, "int"))
-
 let to_ltype_ints_combinator (operator: int -> int -> int): ltype -> ltype -> ltype =
   fun f s -> LInt(operator (int_of_ltype f) (int_of_ltype s))
 
@@ -66,6 +62,8 @@ let global_context: context = ref
     (">", two_arguments_function (fun f s -> LBool((int_of_ltype f) > (int_of_ltype s))));
     (">=", two_arguments_function (fun f s -> LBool((int_of_ltype f) >= (int_of_ltype s))));
     ("eq?", two_arguments_function (fun f s -> LBool(f = s)));
+    ("and", two_arguments_function (fun f s -> LBool((bool_of_ltype f) && (bool_of_ltype s))));
+    ("or", two_arguments_function (fun f s -> LBool((bool_of_ltype f) || (bool_of_ltype s))));
     ("cons", two_arguments_function (fun f s -> LCons(f, s)));
     ("car", one_argument_function ltype_car);
     ("cdr", one_argument_function ltype_cdr);

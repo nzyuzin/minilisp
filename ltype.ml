@@ -56,8 +56,16 @@ let rec is_int (str: string) =
   else
     is_digits str
 
+let int_of_ltype = function
+  | LInt(i) -> i
+  | v -> raise (TypeError (v, "int"))
+
 let is_bool (x: string) =
   x = "#t" || x = "#f"
+
+let bool_of_ltype = function
+  | LBool(b) -> b
+  | v -> raise (TypeError (v, "bool"))
 
 let is_string (x: string) =
   let length = String.length x in
