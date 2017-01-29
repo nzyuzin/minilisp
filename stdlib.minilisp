@@ -26,6 +26,13 @@
     s
     (cons (car f) (append (cdr f) s))))
 
+(define (reverse lst)
+  (define (inner rest acc)
+    (if (null? rest)
+      acc
+      (inner (cdr rest) (cons (car rest) acc))))
+  (inner lst ()))
+
 (define (map f lst)
   (if (null? lst)
     ()
