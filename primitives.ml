@@ -73,4 +73,7 @@ let global_context: context = ref
     ("list", LFunction(fun arguments ctxt -> arguments));
     ("display", one_argument_function (fun lstr -> print_endline (string_of_ltype lstr); LUnit));
     ("newline", zero_or_one_argument_function (fun x -> print_endline ""; LUnit));
+    ("exit", zero_or_one_argument_function (function
+                                            | None -> exit 0
+                                            | Some num -> exit (int_of_ltype num)));
   ]
