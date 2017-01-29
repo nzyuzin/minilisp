@@ -39,10 +39,20 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
       | LBool(true) -> eval then_branch ctxt
       | LBool(false) -> eval else_branch ctxt
       | x -> raise (TypeError (x, "bool")) in
+  let validate_begin = function
+    | LCons(LIdentifier("begin"), _) -> ()
+    | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
+  let rec eval_sequence exprsns some_ctxt =
+    match exprsns with
+    | LCons(expr, LUnit) -> eval expr some_ctxt
+    | LCons(expr, rest) ->
+        let _ = eval expr some_ctxt in
+        eval_sequence rest some_ctxt
+    | x -> eval x some_ctxt in
   let validate_define = function
     | LCons(LIdentifier("define"), LCons(LCons(func_name, func_args), body))
       when is_identifier (unwrap_identifier func_name) -> ()
-    | LCons(LIdentifier("define"), LCons(identifier, body))
+    | LCons(LIdentifier("define"), LCons(identifier, LCons(body, LUnit)))
       when is_identifier (unwrap_identifier identifier) -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   let eval_define dfn =
@@ -62,28 +72,28 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
     let eval_define_function define =
       let func_name = ltype_car (ltype_car (ltype_cdr define)) in
       let fun_args = ltype_cdr (ltype_car (ltype_cdr define)) in
-      let fun_body = ltype_car (ltype_cdr (ltype_cdr define)) in
+      let fun_body = ltype_cdr (ltype_cdr define) in
       (* transforms (define (f args) body) to (define f (lambda (args) body)) *)
       let lambda_transformation =
         LCons(LIdentifier("define"), LCons(LIdentifier(unwrap_identifier func_name), LCons(
-          LCons(LIdentifier("lambda"), LCons(fun_args, LCons(fun_body, LUnit))), LUnit))) in
+          LCons(LIdentifier("lambda"), LCons(fun_args, fun_body)), LUnit))) in
       eval_define_variable lambda_transformation in
     if is_define_function dfn then eval_define_function dfn
     else eval_define_variable dfn in
   let validate_lambda = function
-    | LCons(LIdentifier("lambda"), LCons(lambda_args, LCons(lambda_body, LUnit)))
+    | LCons(LIdentifier("lambda"), LCons(lambda_args, lambda_body))
       when ltype_is_list lambda_args -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   let eval_lambda lambda =
     let lambda_args = ltype_car (ltype_cdr lambda) in
-    let lambda_body = ltype_car (ltype_cdr (ltype_cdr lambda)) in
+    let lambda_body = ltype_cdr (ltype_cdr lambda) in
     LFunction(fun args fctxt ->
       let provided_args_length = ltype_length args in
       let expected_args_length = ltype_length lambda_args in
       if provided_args_length != expected_args_length then
         raise (ArgumentsMismatch(expected_args_length, provided_args_length))
       else
-        eval lambda_body (add_variables_to_context ctxt lambda_args args)) in
+        eval_sequence lambda_body (add_variables_to_context ctxt lambda_args args)) in
   match expression with
   | LUnit -> LUnit
   | LInt(_) as x -> x
@@ -97,6 +107,9 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
   | LCons(LIdentifier("if"), _) as if_expression ->
     validate_if if_expression;
     eval_if if_expression
+  | LCons(LIdentifier("begin"), _) as bgn ->
+      validate_begin bgn;
+      eval_sequence (ltype_cdr bgn) ctxt
   | LCons(LIdentifier("lambda"), _) as lambda ->
     validate_lambda lambda;
     eval_lambda lambda

@@ -1,0 +1,5 @@
+; 12
+
+(define (f n) (define y 2) (+ n y))
+
+(f 10)
