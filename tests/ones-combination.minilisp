@@ -1,0 +1,59 @@
+; (list 1 1 2 5 14 42)
+
+; Computes Catalan numbers
+
+(define (same-ones-amount? seq)
+  (define (equal-amounts? seq ones minus-ones)
+    (if (null? seq)
+      (= ones minus-ones)
+      (if (= (car seq) 1)
+        (equal-amounts? (cdr seq) (+ ones 1) minus-ones)
+        (equal-amounts? (cdr seq) ones (+ minus-ones 1)))))
+  (equal-amounts? seq 0 0))
+
+(define (non-negative? seq)
+  (define (non-neg? seq sum)
+    (if (null? seq)
+      #t
+      (if (< (+ (car seq) sum) 0)
+        #f
+        (non-neg? (cdr seq) (+ (car seq) sum)))))
+  (non-neg? seq 0))
+
+(define (generate-sequences n filters)
+  (define (generate-ones-sequences seq len)
+    (if (= len (* 2 n))
+      (filter filters (list seq))
+      (append (generate-ones-sequences (append seq (list 1)) (+ len 1))
+              (generate-ones-sequences (append seq (list -1)) (+ len 1)))))
+  (generate-ones-sequences (list) 0))
+
+(define (catalan-sequence n)
+  (generate-sequences n (lambda (seq) (and
+                                        (non-negative? seq)
+                                        (same-ones-amount? seq)))))
+
+(define (func-results func n)
+  (define (inner-loop inner-n result)
+    (if (= inner-n n)
+      (cons (func n) result)
+      (inner-loop (+ inner-n 1) (cons (func inner-n) result))))
+  (reverse (inner-loop 0 (list))))
+
+(define (test n)
+  (display "CATALAN SEQUENCE FOR ")
+  (display n)
+  (display ": ")
+  (newline)
+  (display (catalan-sequence n))
+  (newline)
+  (newline)
+  (define res (func-results (lambda(x) (length (catalan-sequence x))) n))
+  (display res)
+  (newline)
+  res)
+
+;(display (generate-sequences 4 (lambda(x) x)))
+
+(test 5)
+
