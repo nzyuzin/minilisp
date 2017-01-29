@@ -67,7 +67,7 @@ let global_context: context = ref
     ("cons", two_arguments_function (fun f s -> LCons(f, s)));
     ("car", one_argument_function ltype_car);
     ("cdr", one_argument_function ltype_cdr);
-    ("nil?", one_argument_function (fun x -> LBool(x = LUnit)));
+    ("null?", one_argument_function (fun x -> LBool(x = LUnit)));
     ("list", LFunction(fun arguments ctxt -> arguments));
     ("display", one_argument_function (fun lstr -> print_endline (string_of_ltype lstr); LUnit));
     ("newline", zero_or_one_argument_function (fun x -> print_endline ""; LUnit));
