@@ -21,8 +21,10 @@
     0
     (+ 1 (length (cdr lst)))))
 
-(define (append el lst)
-  (cons el lst))
+(define (append f s)
+  (if (null? f)
+    s
+    (cons (car f) (append (cdr f) s))))
 
 (define (map f lst)
   (if (null? lst)
