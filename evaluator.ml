@@ -4,7 +4,7 @@ exception IllFormedSpecialForm of string
 exception CannotEvaluate
 exception NotApplicable of string
 exception UnboundValue of string
-exception ArgumentsMismatch of int * int
+exception ArgumentsMismatch of string * int
 
 let rec lookup (ctxt: context) (name: string) : ltype option =
   match !ctxt with
@@ -91,7 +91,7 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
       let provided_args_length = ltype_length args in
       let expected_args_length = ltype_length lambda_args in
       if provided_args_length != expected_args_length then
-        raise (ArgumentsMismatch(expected_args_length, provided_args_length))
+        raise (ArgumentsMismatch(string_of_int expected_args_length, provided_args_length))
       else
         eval_sequence lambda_body (add_variables_to_context ctxt lambda_args args)) in
   match expression with

@@ -45,10 +45,8 @@ let eval_print parsing_result be_quiet =
       | Evaluator.CannotEvaluate -> error "Expression cannot be evaluated."
       | Evaluator.UnboundValue(s) -> error ("Unbound value: " ^ s)
       | Evaluator.ArgumentsMismatch(expected, got) -> error ("Wrong number of "
-          ^ "arguments provided: Expected " ^
-          (if expected < 0 then "at least " ^ (string_of_int (-expected))
-          else string_of_int expected)
-          ^ " but got " ^ string_of_int got ^ "!")
+          ^ "arguments provided: Expected " ^ expected ^ " but got "
+          ^ string_of_int got ^ "!")
       | Ltype.TypeError(actual, expected_type) ->
           error ("The object " ^ (Ltype.string_of_ltype actual)
             ^ " is not of expected type " ^ expected_type)

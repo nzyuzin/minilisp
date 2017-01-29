@@ -17,7 +17,7 @@ passed_tests=0
 
 for test_file in $TEST_FILES; do
   expected_result="$(head -1 $test_file | sed 's/;//')"
-  result="$(./test "$test_file" "$expected_result")"
+  result="$(./test "$test_file" "$expected_result" | tail -1)"
   if [ "$result" = "true" ]; then
     passed_tests=$(($passed_tests + 1))
   else

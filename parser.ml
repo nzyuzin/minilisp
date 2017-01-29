@@ -2,6 +2,7 @@ open Ltype
 
 exception NotSexp of string
 exception NotMatchingBraces
+exception MalformedString of string
 exception InvalidIdentifier of string
 
 type 'b sexp = Value of 'b | Sexp of 'b sexp list
@@ -18,7 +19,7 @@ let rec ltype_of_sexp (expression: string sexp): ltype =
   | Value(v) ->
       if is_int v then LInt(int_of_string v)
       else if is_bool v then LBool(bool_of_ltype_string v)
-      else if is_string v then LString(v)
+      else if is_string v then LString(String.sub v 1 (String.length v - 2))
       else if is_identifier v then LIdentifier(String.lowercase_ascii v)
       else raise (InvalidIdentifier v)
   | Sexp(c) -> begin match c with
@@ -54,6 +55,14 @@ let parse_input (source: string): ltype =
       else
         first_symbol ^ surround_braces (after_first_char str) in
   let read_word (s: string): string =
+    let rec read_str str acc =
+      let length = String.length str in
+      if length = 0 then
+        raise (MalformedString acc)
+      else
+        let f = String.sub str 0 1 in
+        if f = "\"" then (acc ^ f)
+        else read_str (after_first_char str) (acc ^ f) in
     let rec inner str braces =
       let length = String.length str in
       if length = 0 then
@@ -62,7 +71,12 @@ let parse_input (source: string): ltype =
       else
         let first_symbol = String.sub str 0 1 in
         let rest = after_first_char str in
-        if first_symbol = " " && braces = 0 then ""
+        if first_symbol = "\"" then
+          let str_literal = read_str rest first_symbol in
+          let str_literal_length = String.length str_literal in
+          let after_literal = String.sub str str_literal_length (length - str_literal_length) in
+          str_literal ^ inner after_literal braces
+        else if first_symbol = " " && braces = 0 then ""
         else if first_symbol = "(" then
           first_symbol ^ inner rest (braces + 1)
         else if first_symbol = ")" then
@@ -89,10 +103,12 @@ let parse_input (source: string): ltype =
         true
       else if s.[0] = ' ' then false
       else no_spaces (after_first_char s) in
+    let is_literal s =
+      (no_spaces s) || (s.[0] = '"' && s.[String.length s - 1] = '"') in
     if length = 0 then Sexp([])
     else if str.[0] = '(' && str.[length - 1] = ')' && balanced_braces str then
       Sexp(parse_cons (trim (String.sub str 1 (length - 2))))
-    else if no_spaces str then
+    else if is_literal str then
       Value(read_word str)
     else
       raise (NotSexp str) in
