@@ -1,0 +1,3 @@
+; (list #t #f)
+
+(list (or #t #f) (or #f #f))
