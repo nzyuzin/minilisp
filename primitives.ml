@@ -49,6 +49,7 @@ let global_context: context = ref
    ("<=", two_arguments_function (fun f s -> LBool((int_of_ltype f) <= (int_of_ltype s))));
    (">", two_arguments_function (fun f s -> LBool((int_of_ltype f) > (int_of_ltype s))));
    (">=", two_arguments_function (fun f s -> LBool((int_of_ltype f) >= (int_of_ltype s))));
+   ("eq?", two_arguments_function (fun f s -> LBool(f = s)));
    ("cons", two_arguments_function (fun f s -> LCons(f, s)));
    ("car", one_argument_function ltype_car);
    ("cdr", one_argument_function ltype_cdr);

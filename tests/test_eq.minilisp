@@ -1,0 +1,3 @@
+; (list #t #f #f)
+
+(list (eq? (list 1 2) (list 1 2)) (eq? (list 1 2) (list 2 3)) (eq? (list 1 2) (list 1 2 3)))
