@@ -26,13 +26,6 @@
     s
     (cons (car f) (append (cdr f) s))))
 
-(define (reverse lst)
-  (define (inner rest acc)
-    (if (null? rest)
-      acc
-      (inner (cdr rest) (cons (car rest) acc))))
-  (inner lst ()))
-
 (define (map f lst)
   (if (null? lst)
     ()
@@ -49,3 +42,13 @@
   (if (null? lst)
     initial-value
     (combinator (car lst) (fold-right combinator initial-value (cdr lst)))))
+
+(define (fold-left combinator initial-value lst)
+  (define (inner rest acc)
+     (if (null? rest)
+       acc
+       (inner (cdr rest) (combinator (car rest) acc))))
+  (inner lst initial-value))
+
+(define (reverse lst)
+  (fold-left cons () lst))
