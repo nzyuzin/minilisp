@@ -1,7 +1,7 @@
-Primitives.global_context should return new context each time. It will help to
+* Primitives.global_context should return new context each time. It will help to
 avoid having undesirable pollution of global context between runs
 
-Make `and`, `or` to be special forms in eval instead of functions as it's
+* Make `and`, `or` to be special forms in eval instead of functions as it's
 implemented now. The problem of the current approach is that according to
 normal way of function application, the arguments are always evaluated. That's
 not expected of logical operators however. Therefore, the special form should
