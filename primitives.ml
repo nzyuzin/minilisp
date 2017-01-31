@@ -50,8 +50,16 @@ let two_arguments_function (func : 'a -> 'b -> ltype): ltype =
 let to_ltype_ints_combinator (operator: int -> int -> int): ltype -> ltype -> ltype =
   fun f s -> LInt(operator (int_of_ltype f) (int_of_ltype s))
 
+let primitive_apply =
+  LFunction(fun arguments ctxt ->
+    let _ = check_length_equality arguments 2 in
+    let func = ltype_car arguments in
+    let arguments = ltype_car (ltype_cdr arguments) in
+    Evaluator.apply func arguments ctxt)
+
 let global_context: context = ref
   [
+    ("apply", primitive_apply);
     ("+", any_arguments_function (to_ltype_ints_combinator ( + )) (LInt 0));
     ("-", at_least_one_argument_function (to_ltype_ints_combinator ( - )) (LInt 0));
     ("*", any_arguments_function (to_ltype_ints_combinator ( * )) (LInt 1));

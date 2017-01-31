@@ -112,11 +112,12 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
   | LCons(LIdentifier("set!"), _) as set_expression ->
       validate_set set_expression;
       eval_set set_expression
-  | LCons(f, rest) -> apply f rest ctxt
+  | LCons(f, arguments) ->
+      let evaled_func = eval f ctxt in
+      let evaled_arguments = ltype_map arguments (fun x -> eval x ctxt) in
+      apply evaled_func evaled_arguments ctxt
 
-and apply (f: ltype) (arguments: ltype) ctxt: ltype =
-  let evaled_func = eval f ctxt in
-  let evaled_arguments: ltype = ltype_map arguments (fun x -> eval x ctxt) in
-  match evaled_func with
-  | LFunction(func) -> func evaled_arguments ctxt
-  | _ -> raise (NotApplicable (string_of_ltype evaled_func))
+and apply (func: ltype) (arguments: ltype) ctxt: ltype =
+  match func with
+  | LFunction(func) -> func arguments ctxt
+  | _ -> raise (NotApplicable (string_of_ltype func))

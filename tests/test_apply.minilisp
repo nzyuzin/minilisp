@@ -1,0 +1,5 @@
+; 42
+
+(define f (lambda (x) (/ x 2)))
+
+(apply f (list 84))
