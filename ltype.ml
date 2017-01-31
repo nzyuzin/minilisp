@@ -121,3 +121,23 @@ let rec ltype_length = function
   | LUnit -> 0
   | LCons(_, xs) -> 1 + ltype_length xs
   | x -> raise (TypeError (x, "list"))
+
+let rec lookup (ctxt: context) (name: string) : ltype option =
+  match !ctxt with
+  | [] -> None
+  | (name', value) :: xs -> if name = name' then (Some value) else lookup (ref xs) name
+
+let extend_context (ctxt: context) (name: string) (value: ltype): context =
+  ref ((name, value) :: !ctxt)
+
+let unwrap_identifier = function
+  | LIdentifier(name) -> name
+  | x -> raise (TypeError (x, "list"))
+
+let rec add_variables_to_context ctxt vars vals: context =
+  match vars with
+  | LUnit -> ctxt
+  | LCons(var, rest) ->
+      let new_ctxt = extend_context ctxt (unwrap_identifier var) (ltype_car vals) in
+      add_variables_to_context new_ctxt rest (ltype_cdr vals)
+  | x -> raise (TypeError (x, "list"))

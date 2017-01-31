@@ -6,26 +6,6 @@ exception NotApplicable of string
 exception UnboundValue of string
 exception ArgumentsMismatch of string * int
 
-let rec lookup (ctxt: context) (name: string) : ltype option =
-  match !ctxt with
-  | [] -> None
-  | (name', value) :: xs -> if name = name' then (Some value) else lookup (ref xs) name
-
-let extend_context (ctxt: context) (name: string) (value: ltype): context =
-  ref ((name, value) :: !ctxt)
-
-let unwrap_identifier = function
-  | LIdentifier(name) -> name
-  | x -> raise (TypeError (x, "list"))
-
-let rec add_variables_to_context ctxt vars vals: context =
-  match vars with
-  | LUnit -> ctxt
-  | LCons(var, rest) ->
-      let new_ctxt = extend_context ctxt (unwrap_identifier var) (ltype_car vals) in
-      add_variables_to_context new_ctxt rest (ltype_cdr vals)
-  | x -> raise (TypeError (x, "list"))
-
 let rec eval (expression: ltype) (ctxt: context): ltype =
   let validate_if = function
     | LCons(LIdentifier("if"),
@@ -57,7 +37,8 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
   let eval_define dfn =
     let is_define_function = function
-      | LCons(_, LCons(LCons(LIdentifier(_), _), _)) -> true
+      | LCons(_, LCons(LCons(LIdentifier(identifier), _), _))
+        when is_identifier identifier -> true
       | _ -> false in
     let eval_define_variable define =
       let identifier = ltype_car (ltype_cdr define) in
@@ -75,11 +56,23 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
       let fun_body = ltype_cdr (ltype_cdr define) in
       (* transforms (define (f args) body) to (define f (lambda (args) body)) *)
       let lambda_transformation =
-        LCons(LIdentifier("define"), LCons(LIdentifier(unwrap_identifier func_name), LCons(
+        LCons(LIdentifier("define"), LCons(func_name, LCons(
           LCons(LIdentifier("lambda"), LCons(fun_args, fun_body)), LUnit))) in
       eval_define_variable lambda_transformation in
     if is_define_function dfn then eval_define_function dfn
     else eval_define_variable dfn in
+  let validate_set = function
+    | LCons(LIdentifier("set!"), LCons(LIdentifier(identifier), LCons(value, LUnit)))
+      when is_identifier identifier -> ()
+    | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
+  let eval_set set_expression =
+    let identifier = ltype_car (ltype_cdr set_expression) in
+    let prev_value = eval identifier ctxt in
+    let new_value = ltype_car (ltype_cdr (ltype_cdr set_expression)) in
+    let define_transformation =
+      LCons(LIdentifier("define"), LCons(identifier, LCons(new_value, LUnit))) in
+    let _ = eval define_transformation ctxt in
+    prev_value in
   let validate_lambda = function
     | LCons(LIdentifier("lambda"), LCons(lambda_args, lambda_body))
       when ltype_is_list lambda_args -> ()
@@ -116,6 +109,9 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
   | LCons(LIdentifier("define"), _) as define ->
     validate_define define;
     eval_define define
+  | LCons(LIdentifier("set!"), _) as set_expression ->
+      validate_set set_expression;
+      eval_set set_expression
   | LCons(f, rest) -> apply f rest ctxt
 
 and apply (f: ltype) (arguments: ltype) ctxt: ltype =
