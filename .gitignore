@@ -4,4 +4,4 @@
 *.cmx
 *.o
 test
-minilisp
+minischeme
