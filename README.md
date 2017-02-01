@@ -1,4 +1,4 @@
-Minilisp
+Minischeme
 ========
 
 An implementation of a subset of Scheme programming language

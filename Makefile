@@ -1,6 +1,6 @@
 COMPILER = ocamlc
 RELEASE_COMPILER = ocamlopt
-EXECUTABLE = minilisp
+EXECUTABLE = minischeme
 MAIN = main.ml
 SOURCES = ltype.ml parser.ml evaluator.mli evaluator.ml primitives.ml repl.ml
 TEST_SOURCES = test.ml

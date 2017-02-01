@@ -4,9 +4,9 @@ Tests
 Test files
 ----------
 
-Test file is a regular file with a minilisp program with an additional
-condition that the first line of a test file should contain a comment with the
-expected evaluation result of the last line.
+Test file is a regular text file containing a minischeme program with an
+additional condition that the first line of a test file should contain a
+comment with the expected evaluation result of the last line.
 
 Example of a test file:
 
