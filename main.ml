@@ -12,9 +12,7 @@ let _ =
   let _ = Repl.load_stdlib () in
   let file_to_execute: string ref = ref "" in
   let _ = Arg.parse command_line_arguments
-    (fun filename ->
-      let _ = print_endline filename in
-      file_to_execute := filename)
+    (fun filename -> file_to_execute := filename)
     usage in
     if String.length !file_before_repl != 0 then
       let _ = Repl.load_file !file_before_repl (not !verbose) in
