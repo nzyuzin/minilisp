@@ -7,18 +7,6 @@ exception UnboundValue of string
 exception ArgumentsMismatch of string * int
 
 let rec eval (expression: ltype) (ctxt: context): ltype =
-  let validate_if = function
-    | LCons(LIdentifier("if"),
-        LCons(predicate, LCons(then_branch, LCons(else_branch, LUnit)))) -> ()
-    | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
-  let eval_if if_expression =
-    let predicate = ltype_car (ltype_cdr if_expression) in
-    let then_branch = ltype_car (ltype_cdr (ltype_cdr if_expression)) in
-    let else_branch = ltype_car (ltype_cdr (ltype_cdr (ltype_cdr if_expression))) in
-    match eval predicate ctxt with
-      | LBool(true) -> eval then_branch ctxt
-      | LBool(false) -> eval else_branch ctxt
-      | x -> raise (TypeError (x, "bool")) in
   let validate_begin = function
     | LCons(LIdentifier("begin"), _) -> ()
     | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
@@ -29,6 +17,55 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
         let _ = eval expr some_ctxt in
         eval_sequence rest some_ctxt
     | x -> eval x some_ctxt in
+  let validate_if = function
+    | LCons(LIdentifier("if"),
+        LCons(predicate, LCons(then_branch, LCons(else_branch, LUnit)))) -> ()
+    | LCons(LIdentifier("if"), LCons(predicate, LCons(then_branch, LUnit))) -> ()
+    | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
+  let eval_if if_expression =
+    let predicate = ltype_car (ltype_cdr if_expression) in
+    let then_branch = ltype_car (ltype_cdr (ltype_cdr if_expression)) in
+    let else_branch = ltype_car (ltype_cdr (ltype_cdr (ltype_cdr if_expression))) in
+    match eval predicate ctxt with
+      | LBool(true) -> eval then_branch ctxt
+      | LBool(false) -> eval else_branch ctxt
+      | x -> raise (TypeError (x, "bool")) in
+  let eval_cond cond_expression =
+    let is_regular_clause = function
+      | LCons(LIdentifier("else"), body) -> false
+      | LCons(predicate, LCons(LIdentifier("=>"), body)) -> true
+      | LCons(predicate, body) -> true
+      | _ -> false in
+    let is_else_clause = function
+      | LCons(LIdentifier("else"), body) when body != LUnit -> true
+      | _ -> false in
+    let rec is_clauses = function
+      | LUnit -> false
+      | LCons(clause, LUnit)
+        when is_regular_clause clause || (is_else_clause clause) -> true
+      | LCons(clause, rest)
+        when is_regular_clause clause && (not (is_else_clause clause)) && rest != LUnit ->
+          is_clauses rest
+      | x -> false in
+    let validate_cond = function
+      | LCons(LIdentifier("cond"), clauses) when is_clauses clauses -> ()
+      | x -> raise (IllFormedSpecialForm (string_of_ltype x)) in
+    let clause_predicate clause = ltype_car clause in
+    let clause_body clause =
+      let after_pred = ltype_cdr clause in
+      if after_pred != LUnit && (ltype_car after_pred) = LIdentifier("=>") then
+        ltype_cdr after_pred
+      else after_pred in
+    let rec eval_clauses clauses =
+      let clause = ltype_car clauses in
+      let rest_clauses = ltype_cdr clauses in
+      if is_else_clause clause then eval_sequence (clause_body clause) ctxt
+      else match eval (clause_predicate clause) ctxt with
+        | LBool(true) as tru -> eval_sequence (LCons(tru, (clause_body clause))) ctxt
+        | LBool(false) -> if rest_clauses = LUnit then LUnit else eval_clauses rest_clauses
+        | x -> raise (TypeError (x, "bool")) in
+    validate_cond cond_expression;
+    eval_clauses (ltype_cdr cond_expression) in
   let validate_define = function
     | LCons(LIdentifier("define"), LCons(LCons(func_name, func_args), body))
       when is_identifier (unwrap_identifier func_name) -> ()
@@ -100,6 +137,7 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
   | LCons(LIdentifier("if"), _) as if_expression ->
     validate_if if_expression;
     eval_if if_expression
+  | LCons(LIdentifier("cond"), _) as cond_expression -> eval_cond cond_expression
   | LCons(LIdentifier("begin"), _) as bgn ->
       validate_begin bgn;
       eval_sequence (ltype_cdr bgn) ctxt
