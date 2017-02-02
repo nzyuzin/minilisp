@@ -10,7 +10,7 @@ if [ ! -f "./test" ]; then
   exit 2
 fi
 
-TEST_FILES=$(find tests -name '*.minilisp')
+TEST_FILES=$(find tests -name '*.minilisp' -or -name '*.minischeme')
 
 TESTS_NUMBER="$(wc -w <<< $TEST_FILES | sed 's/[^0-9]//g')"
 passed_tests=0
