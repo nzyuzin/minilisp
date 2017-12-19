@@ -38,6 +38,11 @@ let rec eval (expression: ltype) (ctxt: context): ltype =
       let evaled_arguments = ltype_map arguments (fun x -> eval x ctxt) in
       apply evaled_func evaled_arguments ctxt
 
+and apply (func: ltype) (arguments: ltype) ctxt: ltype =
+  match func with
+  | LFunction(func) -> func arguments ctxt
+  | _ -> raise (NotApplicable (string_of_ltype func))
+
 and  validate_begin = function
   | LCons(LIdentifier("begin"), _) -> ()
   | x -> raise (IllFormedSpecialForm (string_of_ltype x))
@@ -165,8 +170,3 @@ and eval_lambda lambda ctxt =
       raise (ArgumentsMismatch(string_of_int expected_args_length, provided_args_length))
     else
       eval_sequence lambda_body (add_variables_to_context ctxt lambda_args args))
-
-and apply (func: ltype) (arguments: ltype) ctxt: ltype =
-  match func with
-  | LFunction(func) -> func arguments ctxt
-  | _ -> raise (NotApplicable (string_of_ltype func))
